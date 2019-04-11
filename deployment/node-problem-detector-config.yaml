@@ -84,7 +84,59 @@ data:
             }
         ]
     }
+  fd-problem-monitor.json: |
+    {
+      "plugin": "custom",
+      "pluginConfig": {
+        "invoke_interval": "30s",
+        "timeout": "15s",
+        "max_output_length": 80,
+        "concurrency": 3,
+        "enable_message_change_based_condition_update": false
+      },
+      "source": "fd-custom-plugin-monitor",
+      "conditions": [
+        {
+          "type": "FDPressure",
+          "reason": "NodeHasNoFDPressure",
+          "message": "node has no fd pressure"
+        }
+      ],
+      "rules": [
+        {
+          "type": "temporary",
+          "reason": "TooManyOpenFiles",
+          "path": "/config/plugin/check_fd.sh",
+          "message": "more than 80% fd has been used"
+        }
+      ]
+    }
+  check_fd.sh: |
+      #!/bin/bash
+
+      # check max fd open files
+
+      OK=0
+      NONOK=1
+      UNKNOWN=2
+
+      which lsof > /dev/null
+      if [ $? -ne 0 ]; then
+          echo "lsof is not support"
+          exit $UNKNOWN
+      fi
+
+      count=$(lsof | wc -l)
+      max=$(cat /proc/sys/fs/file-max)
+
+      echo "current fd is $count and max is $max"
+      if [[ $count -gt $((max*8/10)) ]]; then
+          echo "more than 80% fd has been used($count:$max)"
+         exit $NONOK
+      fi
+      echo "fd is ok"
+      exit $OK
 kind: ConfigMap
 metadata:
   name: node-problem-detector-config
-  namespace: default
+  namespace: kube-system
