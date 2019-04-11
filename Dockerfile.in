@@ -17,10 +17,14 @@ MAINTAINER Random Liu <lantaol@google.com>
 
 RUN clean-install libsystemd0 bash
 
+RUN apt-get update && apt-get install -y lsof \
+	&& rm -rf /var/lib/apt/lists/*
+
 # Avoid symlink of /etc/localtime.
 RUN test -h /etc/localtime && rm -f /etc/localtime && cp /usr/share/zoneinfo/UTC /etc/localtime || true
 
 ADD ./bin/node-problem-detector /node-problem-detector
 ADD ./bin/log-counter /home/kubernetes/bin/log-counter
 ADD config /config
+RUN chmod +x /config/plugin/*.sh
 ENTRYPOINT ["/node-problem-detector", "--system-log-monitors=/config/kernel-monitor.json"]
