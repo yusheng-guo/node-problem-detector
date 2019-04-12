@@ -88,8 +88,8 @@ data:
     {
       "plugin": "custom",
       "pluginConfig": {
-        "invoke_interval": "30s",
-        "timeout": "15s",
+        "invoke_interval": "300s",
+        "timeout": "120s",
         "max_output_length": 80,
         "concurrency": 3,
         "enable_message_change_based_condition_update": false
@@ -120,14 +120,15 @@ data:
       NONOK=1
       UNKNOWN=2
 
-      which lsof > /dev/null
-      if [ $? -ne 0 ]; then
-          echo "lsof is not support"
-          exit $UNKNOWN
-      fi
+      cd /host/proc
+      sum=0
+      for pid in [0-9]*
+      do
+        sum=$(($sum+$(ls /host/proc/$pid/fd/ | wc -l)))
+      done
 
-      count=$(lsof | wc -l)
-      max=$(cat /proc/sys/fs/file-max)
+      count=$(sum)
+      max=$(cat /host/proc/sys/fs/file-max)
 
       echo "current fd is $count and max is $max"
       if [[ $count -gt $((max*8/10)) ]]; then
