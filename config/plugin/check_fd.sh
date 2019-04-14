@@ -17,7 +17,7 @@ max=$(cat /proc/sys/fs/file-max)
 
 echo "current fd is $count and max is $max"
 if [[ $count -gt $((max*8/10)) ]]; then
-    echo "more than 80% fd has been used($count:$max)"
+   echo "more than 80 percent of fd has been used($count:$max)"
    exit $NONOK
 fi
 echo "fd is ok"
