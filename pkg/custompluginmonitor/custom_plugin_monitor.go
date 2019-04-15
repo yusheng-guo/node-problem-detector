@@ -140,7 +140,7 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 						}
 					}
 
-					events = append(events, util.GenerateConditionChangeEvent(
+					events = append(events, util.GenerateWarnConditionChangeEvent(
 						condition.Type,
 						status,
 						defaultConditionReason,
