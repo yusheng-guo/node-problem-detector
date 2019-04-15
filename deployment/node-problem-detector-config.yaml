@@ -130,7 +130,7 @@ data:
          echo "current fd usage is $count and max is $max"
          exit $NONOK
       fi
-      echo "fd usage is ok"
+      echo "node has no fd pressure"
       exit $OK
 kind: ConfigMap
 metadata:
