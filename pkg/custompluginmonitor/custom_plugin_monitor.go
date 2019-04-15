@@ -127,7 +127,9 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 			if condition.Type == result.Rule.Condition {
 				status := toConditionStatus(result.ExitStatus)
 				// change 1: Condition status change from True to False/Unknown
-				if condition.Status == types.True && status != types.True {
+
+				//if condition.Status == types.True && status != types.True {
+				if status != types.True && !(status == condition.Status) {
 					condition.Transition = timestamp
 					var defaultConditionReason string
 					var defaultConditionMessage string
@@ -177,7 +179,7 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 					condition.Status = status
 					condition.Reason = result.Rule.Reason
 				} else if condition.Status == status &&
-					(condition.Reason != result.Rule.Reason ||
+					((condition.Reason != result.Rule.Reason && status == types.True) ||
 						(*c.config.PluginGlobalConfig.EnableMessageChangeBasedConditionUpdate && condition.Message != result.Message)) {
 					// change 4: Condition status do not change.
 					// condition reason changes or

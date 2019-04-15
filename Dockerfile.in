@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM @BASEIMAGE@
+FROM centos:7
 MAINTAINER Random Liu <lantaol@google.com>
 
-RUN clean-install libsystemd0 bash
+# RUN clean-install libsystemd0 bash
 
-RUN apt-get update && apt-get install -y lsof \
-	&& rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y lsof curl && rm -rf /var/lib/apt/lists/*
+
+RUN yum update -y \
+	&& yum install -y lsof curl \
+	&& yum clean all
 
 # Avoid symlink of /etc/localtime.
 RUN test -h /etc/localtime && rm -f /etc/localtime && cp /usr/share/zoneinfo/UTC /etc/localtime || true
