@@ -92,7 +92,7 @@ data:
         "timeout": "90s",
         "max_output_length": 80,
         "concurrency": 3,
-        "enable_message_change_based_condition_update": true
+        "enable_message_change_based_condition_update": false
       },
       "source": "fd-custom-plugin-monitor",
       "conditions": [
@@ -130,7 +130,7 @@ data:
          echo "current fd usage is $count and max is $max"
          exit $NONOK
       fi
-      echo "fd usage is ok"
+      echo "node has no fd pressure"
       exit $OK
 kind: ConfigMap
 metadata:

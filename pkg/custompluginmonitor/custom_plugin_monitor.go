@@ -154,7 +154,7 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 					// change 2: Condition status change from False/Unknown to True
 					condition.Transition = timestamp
 					condition.Message = result.Message
-					events = append(events, util.GenerateConditionChangeEvent(
+					events = append(events, util.GenerateWarnConditionChangeEvent(
 						condition.Type,
 						status,
 						result.Rule.Reason,

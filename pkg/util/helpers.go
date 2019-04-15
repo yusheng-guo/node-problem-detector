@@ -33,6 +33,15 @@ func GenerateConditionChangeEvent(t string, status types.ConditionStatus, reason
 	}
 }
 
+func GenerateWarnConditionChangeEvent(t string, status types.ConditionStatus, reason string, timestamp time.Time) types.Event {
+	return types.Event{
+		Severity:  types.Warn,
+		Timestamp: timestamp,
+		Reason:    reason,
+		Message:   fmt.Sprintf("Node condition %s is now: %s, reason: %s", t, status, reason),
+	}
+}
+
 func GetUptimeDuration() (time.Duration, error) {
 	var info syscall.Sysinfo_t
 	if err := syscall.Sysinfo(&info); err != nil {
