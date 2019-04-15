@@ -22,7 +22,7 @@ spec:
         - --logtostderr
         - --system-log-monitors=/config/kernel-monitor.json,/config/docker-monitor.json
         - --custom-plugin-monitors=/config/fd-problem-monitor.json
-        image: registry.cn-beijing.aliyuncs.com/acs/node-problem-detector:v0.6.3
+        image: registry.cn-beijing.aliyuncs.com/acs/node-problem-detector:v0.6.3-16-g30dab97
         resources:
           limits:
             cpu: 10m
