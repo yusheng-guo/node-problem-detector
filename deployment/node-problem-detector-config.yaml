@@ -92,7 +92,7 @@ data:
         "timeout": "90s",
         "max_output_length": 80,
         "concurrency": 3,
-        "enable_message_change_based_condition_update": false
+        "enable_message_change_based_condition_update": true
       },
       "source": "fd-custom-plugin-monitor",
       "conditions": [
@@ -104,10 +104,11 @@ data:
       ],
       "rules": [
         {
-          "type": "temporary",
-          "reason": "TooManyOpenFiles",
+          "type": "permanent",
+          "condition": "FDPressure",
+          "reason": "NodeHasFDPressure",
           "path": "/config/plugin/check_fd.sh",
-          "message": "more than 80% fd has been used"
+          "message": "too many fds have been used"
         }
       ]
     }
@@ -125,12 +126,11 @@ data:
       count=$(find -maxdepth 1 -type d -name '[0-9]*' | xargs -I {} ls {}/fd | wc -l)
       max=$(cat /host/proc/sys/fs/file-max)
 
-      echo "current fd is $count and max is $max"
-      if [[ $count -gt $((max*8/10)) ]]; then
-         echo "more than 80% fd has been used($count:$max)"
+      if [[ $count -gt $((max*80/100)) ]]; then
+         echo "current fd usage is $count and max is $max"
          exit $NONOK
       fi
-      echo "fd is ok"
+      echo "fd usage is ok"
       exit $OK
 kind: ConfigMap
 metadata:
