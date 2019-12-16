@@ -14,15 +14,13 @@ spec:
       labels:
         app: node-problem-detector
     spec:
-      serviceAccountName: admin
       containers:
       - name: node-problem-detector
         command:
         - /node-problem-detector
         - --logtostderr
         - --system-log-monitors=/config/kernel-monitor.json,/config/docker-monitor.json
-        - --custom-plugin-monitors=/config/fd-problem-monitor.json
-        image: registry.cn-beijing.aliyuncs.com/acs/node-problem-detector:v0.6.3-16-g30dab97
+        image: k8s.gcr.io/node-problem-detector:v0.6.3
         resources:
           limits:
             cpu: 10m
@@ -53,9 +51,6 @@ spec:
         - name: config
           mountPath: /config
           readOnly: true
-        - mountPath: /host/proc
-          name: proc
-          readOnly: true
       volumes:
       - name: log
         # Config `log` to your system log directory
@@ -67,19 +62,11 @@ spec:
       - name: localtime
         hostPath:
           path: /etc/localtime
-      - name: proc
-        hostPath:
-          path: /proc
       - name: config
         configMap:
           name: node-problem-detector-config
-          defaultMode: 0755
           items:
           - key: kernel-monitor.json
             path: kernel-monitor.json
           - key: docker-monitor.json
             path: docker-monitor.json
-          - key: fd-problem-monitor.json
-            path: fd-problem-monitor.json
-          - key: check_fd.sh
-            path: plugin/check_fd.sh

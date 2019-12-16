@@ -53,48 +53,67 @@ func (p *Plugin) GetResultChan() <-chan cpmtypes.Result {
 }
 
 func (p *Plugin) Run() {
-	runTicker := time.NewTicker(*p.config.PluginGlobalConfig.InvokeInterval)
+	defer func() {
+		glog.Info("Stopping plugin execution")
+		close(p.resultChan)
+		p.tomb.Done()
+	}()
 
+	runTicker := time.NewTicker(*p.config.PluginGlobalConfig.InvokeInterval)
+	defer runTicker.Stop()
+
+	// on boot run once
+	select {
+	case <-p.tomb.Stopping():
+		return
+	default:
+		p.runRules()
+	}
+
+	// run every InvokeInterval
 	for {
 		select {
 		case <-runTicker.C:
-			glog.Info("Start to run custom plugins")
-
-			for _, rule := range p.config.Rules {
-				p.syncChan <- struct{}{}
-				p.Add(1)
-
-				go func(rule *cpmtypes.CustomRule) {
-					defer p.Done()
-					defer func() {
-						<-p.syncChan
-					}()
-
-					start := time.Now()
-					exitStatus, message := p.run(*rule)
-					end := time.Now()
-
-					glog.V(3).Infof("Rule: %+v. Start time: %v. End time: %v. Duration: %v", rule, start, end, end.Sub(start))
-
-					result := cpmtypes.Result{
-						Rule:       rule,
-						ExitStatus: exitStatus,
-						Message:    message,
-					}
-
-					p.resultChan <- result
-
-					glog.Infof("Add check result %+v for rule %+v", result, rule)
-				}(rule)
-			}
-
-			p.Wait()
-			glog.Info("Finish running custom plugins")
+			p.runRules()
 		case <-p.tomb.Stopping():
-			glog.Info("Stopping plugin execution")
-			p.tomb.Done()
+			return
 		}
 	}
+}
+
+// run each rule in parallel and wait for them to complete
+func (p *Plugin) runRules() {
+	glog.Info("Start to run custom plugins")
+
+	for _, rule := range p.config.Rules {
+		p.syncChan <- struct{}{}
+		p.Add(1)
+		go func(rule *cpmtypes.CustomRule) {
+			defer p.Done()
+			defer func() {
+				<-p.syncChan
+			}()
+
+			start := time.Now()
+			exitStatus, message := p.run(*rule)
+			end := time.Now()
+
+			glog.V(3).Infof("Rule: %+v. Start time: %v. End time: %v. Duration: %v", rule, start, end, end.Sub(start))
+
+			result := cpmtypes.Result{
+				Rule:       rule,
+				ExitStatus: exitStatus,
+				Message:    message,
+			}
+
+			p.resultChan <- result
+
+			glog.Infof("Add check result %+v for rule %+v", result, rule)
+		}(rule)
+	}
+
+	p.Wait()
+	glog.Info("Finish running custom plugins")
 }
 
 func (p *Plugin) run(rule cpmtypes.CustomRule) (exitStatus cpmtypes.Status, output string) {
