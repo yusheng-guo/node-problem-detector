@@ -32,6 +32,7 @@ var (
 	defaultMaxOutputLength                   = 80
 	defaultConcurrency                       = 3
 	defaultMessageChangeBasedConditionUpdate = false
+	defaultEnableMetricsReporting            = true
 
 	customPluginName = "custom"
 )
@@ -66,6 +67,8 @@ type CustomPluginConfig struct {
 	DefaultConditions []types.Condition `json:"conditions"`
 	// Rules are the rules custom plugin monitor will follow to parse and invoke plugins.
 	Rules []*CustomRule `json:"rules"`
+	// EnableMetricsReporting describes whether to report problems as metrics or not.
+	EnableMetricsReporting *bool `json:"metricsReporting,omitempty"`
 }
 
 // ApplyConfiguration applies default configurations.
@@ -112,6 +115,10 @@ func (cpc *CustomPluginConfig) ApplyConfiguration() error {
 		}
 	}
 
+	if cpc.EnableMetricsReporting == nil {
+		cpc.EnableMetricsReporting = &defaultEnableMetricsReporting
+	}
+
 	return nil
 }
 
@@ -131,6 +138,23 @@ func (cpc CustomPluginConfig) Validate() error {
 	for _, rule := range cpc.Rules {
 		if _, err := os.Stat(rule.Path); os.IsNotExist(err) {
 			return fmt.Errorf("rule path %q does not exist. Rule: %+v", rule.Path, rule)
+		}
+	}
+
+	for _, rule := range cpc.Rules {
+		if rule.Type != types.Perm {
+			continue
+		}
+		conditionType := rule.Condition
+		defaultConditionExists := false
+		for _, cond := range cpc.DefaultConditions {
+			if conditionType == cond.Type {
+				defaultConditionExists = true
+				break
+			}
+		}
+		if !defaultConditionExists {
+			return fmt.Errorf("Permanent problem %s does not have preset default condition.", conditionType)
 		}
 	}
 
