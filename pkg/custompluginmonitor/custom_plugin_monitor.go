@@ -182,6 +182,8 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 				}
 
 				needToUpdateCondition := true
+				warningTypeEvent := false
+
 				var newReason string
 				var newMessage string
 				status := toConditionStatus(result.ExitStatus)
@@ -197,6 +199,7 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 					// Scenario 2: Condition status changes from False/Unknown to True
 					newReason = result.Rule.Reason
 					newMessage = result.Message
+					warningTypeEvent = true
 				} else if condition.Status != status {
 					// Scenario 3: Condition status changes from False to Unknown or vice versa
 					newReason = defaultConditionReason
@@ -226,12 +229,22 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 					condition.Reason = newReason
 					condition.Message = newMessage
 
-					updateEvent := util.GenerateConditionChangeEvent(
-						condition.Type,
-						status,
-						newReason,
-						timestamp,
-					)
+					var updateEvent types.Event
+					if warningTypeEvent {
+						updateEvent = util.GenerateWarnConditionChangeEvent(
+							condition.Type,
+							status,
+							newReason,
+							timestamp,
+						)
+					} else {
+						updateEvent = util.GenerateConditionChangeEvent(
+							condition.Type,
+							status,
+							newReason,
+							timestamp,
+						)
+					}
 
 					if status == types.True {
 						activeProblemEvents = append(activeProblemEvents, updateEvent)
