@@ -37,12 +37,12 @@ func GenerateConditionChangeEvent(t string, status types.ConditionStatus, reason
 	}
 }
 
-func GenerateWarnConditionChangeEvent(reason string, timestamp time.Time,msg string) types.Event {
+func GenerateWarnConditionChangeEvent(t string, status types.ConditionStatus, reason string, timestamp time.Time, msg string) types.Event {
 	return types.Event{
 		Severity:  types.Warn,
 		Timestamp: timestamp,
 		Reason:    reason,
-		Message:   msg,
+		Message:   fmt.Sprintf("Node condition %s is now: %s, reason: %s, msg: %s", t, status, reason, msg),
 	}
 }
 
