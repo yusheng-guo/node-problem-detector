@@ -193,6 +193,7 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 						types.True,
 						rule.Reason,
 						timestamp,
+						condition.Message,
 					))
 				}
 				condition.Status = types.True

@@ -231,6 +231,7 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 						status,
 						newReason,
 						timestamp,
+						result.Message,
 					)
 
 					if status == types.True {
