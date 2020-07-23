@@ -19,7 +19,16 @@ package systemlogmonitor
 import (
 	"encoding/json"
 	"io/ioutil"
+	"k8s.io/heapster/common/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/node-problem-detector/cmd/options"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
+	"fmt"
 
 	"github.com/golang/glog"
 
@@ -32,9 +41,19 @@ import (
 	"k8s.io/node-problem-detector/pkg/types"
 	"k8s.io/node-problem-detector/pkg/util"
 	"k8s.io/node-problem-detector/pkg/util/tomb"
+	"k8s.io/node-problem-detector/pkg/version"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const SystemLogMonitorName = "system-log-monitor"
+const (
+	SystemLogMonitorName = "system-log-monitor"
+	OOMREASON            = "PodOOMKilling"
+)
+
+var (
+	uuidRegx                      *regexp.Regexp
+	k8sClient                     *clientset.Clientset
+)
 
 func init() {
 	problemdaemon.Register(
@@ -42,6 +61,10 @@ func init() {
 		types.ProblemDaemonHandler{
 			CreateProblemDaemonOrDie: NewLogMonitorOrDie,
 			CmdOptionDescription:     "Set to config file paths."})
+}
+
+func init() {
+	uuidRegx = regexp.MustCompile("[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}")
 }
 
 type logMonitor struct {
@@ -53,6 +76,17 @@ type logMonitor struct {
 	logCh      <-chan *logtypes.Log
 	output     chan *types.Status
 	tomb       *tomb.Tomb
+}
+
+func InitK8sClientOrDie(options *options.NodeProblemDetectorOptions) *clientset.Clientset{
+	uri, _ := url.Parse(options.ApiServerOverride)
+	cfg, err := kubernetes.GetKubeClientConfig(uri)
+	if err != nil {
+		panic(err)
+	}
+	cfg.UserAgent = fmt.Sprintf("%s/%s", filepath.Base(os.Args[0]), version.Version())
+	k8sClient = clientset.NewForConfigOrDie(cfg)
+	return k8sClient
 }
 
 // NewLogMonitorOrDie create a new LogMonitor, panic if error occurs.
@@ -167,6 +201,22 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 	// We use the timestamp of the first log line as the timestamp of the status.
 	timestamp := logs[0].Timestamp
 	message := generateMessage(logs)
+	if rule.Reason == OOMREASON && k8sClient != nil{
+		uuid := string(uuidRegx.Find([]byte(message)))
+		uuid = strings.ReplaceAll(uuid,"_","-")
+		pl, err := k8sClient.CoreV1().Pods("").List(metav1.ListOptions{})
+		if err != nil {
+			glog.Error("Error in getting pods: %v", err.Error())
+		} else {
+			for _, pod := range pl.Items {
+				if string(pod.UID) == uuid {
+					message = fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
+						pod.Spec.NodeName, pod.Name, pod.Namespace, uuid)
+					break
+				}
+			}
+		}
+	}
 	var events []types.Event
 	var changedConditions []*types.Condition
 	if rule.Type == types.Temp {
