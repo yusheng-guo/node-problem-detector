@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/node-problem-detector/pkg/systemlogmonitor"
 	"os"
 
 	"github.com/golang/glog"
@@ -55,6 +56,11 @@ func main() {
 		glog.Fatalf("No problem daemon is configured")
 	}
 
+	if c := systemlogmonitor.InitK8sClientOrDie(npdo); c != nil {
+		glog.Info("System Log Monitor K8S client initialized")
+	} else {
+		glog.Error("Failed to initialize System Log Monitor K8S client")
+	}
 	// Initialize exporters.
 	defaultExporters := []types.Exporter{}
 	if ke := k8sexporter.NewExporterOrDie(npdo); ke != nil {
