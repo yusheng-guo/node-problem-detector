@@ -19,12 +19,12 @@ package problemclient
 import (
 	"encoding/json"
 	"fmt"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/node-problem-detector/pkg/util"
 	"net/url"
 	"os"
 	"path/filepath"
-
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +48,7 @@ type Client interface {
 	// Eventf reports the event.
 	Eventf(eventType string, source, reason, messageFmt string, args ...interface{})
 	// GetNode returns the Node object of the node on which the
+	PodEventf(eventType string, source, reason, messageFmt string, args ...interface{})
 	// node-problem-detector runs.
 	GetNode() (*v1.Node, error)
 }
@@ -117,6 +118,25 @@ func (c *nodeProblemClient) Eventf(eventType, source, reason, messageFmt string,
 		c.recorders[source] = recorder
 	}
 	recorder.Eventf(c.nodeRef, eventType, reason, messageFmt, args...)
+}
+
+// PodEventf will send Pod type event
+func (c *nodeProblemClient) PodEventf(eventType, source, reason, messageFmt string, args ...interface{}) {
+	recorder, found := c.recorders[source]
+	if !found {
+		recorder = getEventRecorder(c.client, c.nodeName, source)
+		c.recorders[source] = recorder
+	}
+	rst := util.PodOOMRegex.FindStringSubmatch(messageFmt)
+
+	podRef := &v1.ObjectReference{
+		Kind:      "Pod",
+		Name:      rst[2],
+		UID:       types.UID(rst[2]),
+		Namespace: rst[3],
+	}
+
+	recorder.Eventf(podRef, eventType, reason, messageFmt, args...)
 }
 
 func (c *nodeProblemClient) GetNode() (*v1.Node, error) {

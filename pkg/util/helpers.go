@@ -17,6 +17,7 @@ package util
 
 import (
 	"fmt"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -26,6 +27,8 @@ import (
 )
 
 var osReleasePath = "/etc/os-release"
+
+var PodOOMRegex = regexp.MustCompile(`node:(\S+)\s+pod:(\S+)\s+namespace:(\S+)\s+uuid:(\S+)`)
 
 // GenerateConditionChangeEvent generates an event for condition change.
 func GenerateConditionChangeEvent(t string, status types.ConditionStatus, reason string, timestamp time.Time, msg string) types.Event {

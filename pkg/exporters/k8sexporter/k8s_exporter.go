@@ -69,7 +69,11 @@ func NewExporterOrDie(npdo *options.NodeProblemDetectorOptions) types.Exporter {
 
 func (ke *k8sExporter) ExportProblems(status *types.Status) {
 	for _, event := range status.Events {
-		ke.client.Eventf(util.ConvertToAPIEventType(event.Severity), status.Source, event.Reason, event.Message)
+		if event.ObjectType != "Pod"{
+			ke.client.Eventf(util.ConvertToAPIEventType(event.Severity), status.Source, event.Reason, event.Message)
+		}else {
+			ke.client.PodEventf(util.ConvertToAPIEventType(event.Severity), status.Source, event.Reason, event.Message)
+		}
 	}
 	for _, cdt := range status.Conditions {
 		ke.conditionManager.UpdateCondition(cdt)
