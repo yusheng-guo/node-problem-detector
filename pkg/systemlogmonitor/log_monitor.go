@@ -225,7 +225,6 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 		// For temporary error only generate event
 		events = append(events, types.Event{
 			Severity:   types.Warn,
-			ObjectType: "Pod",
 			Timestamp:  timestamp,
 			Reason:     rule.Reason,
 			Message:    message,

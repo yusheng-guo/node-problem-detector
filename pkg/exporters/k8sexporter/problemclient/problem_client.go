@@ -120,7 +120,7 @@ func (c *nodeProblemClient) Eventf(eventType, source, reason, messageFmt string,
 	recorder.Eventf(c.nodeRef, eventType, reason, messageFmt, args...)
 }
 
-// PodEventf will send Pod type event
+
 func (c *nodeProblemClient) PodEventf(eventType, source, reason, messageFmt string, args ...interface{}) {
 	recorder, found := c.recorders[source]
 	if !found {
