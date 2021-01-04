@@ -19,19 +19,21 @@ package systemlogmonitor
 import (
 	"encoding/json"
 	"io/ioutil"
-	"k8s.io/heapster/common/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/heapster/common/kubernetes"
 	"k8s.io/node-problem-detector/cmd/options"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
+
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/node-problem-detector/pkg/problemdaemon"
 	"k8s.io/node-problem-detector/pkg/problemmetrics"
 	"k8s.io/node-problem-detector/pkg/systemlogmonitor/logwatchers"
@@ -42,7 +44,6 @@ import (
 	"k8s.io/node-problem-detector/pkg/util"
 	"k8s.io/node-problem-detector/pkg/util/tomb"
 	"k8s.io/node-problem-detector/pkg/version"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -51,8 +52,8 @@ const (
 )
 
 var (
-	uuidRegx                      *regexp.Regexp
-	k8sClient                     *clientset.Clientset
+	uuidRegx  *regexp.Regexp
+	k8sClient *clientset.Clientset
 )
 
 func init() {
@@ -78,7 +79,7 @@ type logMonitor struct {
 	tomb       *tomb.Tomb
 }
 
-func InitK8sClientOrDie(options *options.NodeProblemDetectorOptions) *clientset.Clientset{
+func InitK8sClientOrDie(options *options.NodeProblemDetectorOptions) *clientset.Clientset {
 	uri, _ := url.Parse(options.ApiServerOverride)
 	cfg, err := kubernetes.GetKubeClientConfig(uri)
 	if err != nil {
@@ -201,9 +202,10 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 	// We use the timestamp of the first log line as the timestamp of the status.
 	timestamp := logs[0].Timestamp
 	message := generateMessage(logs)
-	if rule.Reason == OOMREASON && k8sClient != nil{
+	if rule.Reason == OOMREASON && k8sClient != nil {
 		uuid := string(uuidRegx.Find([]byte(message)))
-		uuid = strings.ReplaceAll(uuid,"_","-")
+
+		uuid = strings.ReplaceAll(uuid, "_", "-")
 		pl, err := k8sClient.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
 			glog.Error("Error in getting pods: %v", err.Error())
@@ -222,10 +224,10 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 	if rule.Type == types.Temp {
 		// For temporary error only generate event
 		events = append(events, types.Event{
-			Severity:  types.Warn,
-			Timestamp: timestamp,
-			Reason:    rule.Reason,
-			Message:   message,
+			Severity:   types.Warn,
+			Timestamp:  timestamp,
+			Reason:     rule.Reason,
+			Message:    message,
 		})
 	} else {
 		// For permanent error changes the condition
