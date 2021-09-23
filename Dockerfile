@@ -26,6 +26,6 @@ ADD ./bin/node-problem-detector /node-problem-detector
 ARG LOGCOUNTER
 COPY ./bin/health-checker ${LOGCOUNTER} /home/kubernetes/bin/
 
-RUN chmod +x /config/plugin/*.sh
 COPY config /config
+RUN chmod +x /config/plugin/*.sh
 ENTRYPOINT ["/node-problem-detector", "--config.system-log-monitor=/config/kernel-monitor.json"]
