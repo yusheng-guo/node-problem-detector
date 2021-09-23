@@ -21,12 +21,21 @@ import (
 	"os"
 	"path"
 	"strings"
+<<<<<<< HEAD
+=======
+	"time"
+>>>>>>> v0.8.10
 
 	"k8s.io/node-problem-detector/pkg/util/metrics"
 	"k8s.io/node-problem-detector/test/e2e/lib/gce"
 	"k8s.io/node-problem-detector/test/e2e/lib/npd"
 
 	"github.com/onsi/ginkgo"
+<<<<<<< HEAD
+=======
+	"github.com/onsi/ginkgo/config"
+	. "github.com/onsi/gomega"
+>>>>>>> v0.8.10
 	"github.com/pborman/uuid"
 )
 
@@ -57,6 +66,7 @@ var _ = ginkgo.Describe("NPD should export Prometheus metrics.", func() {
 			},
 			*image,
 			*imageProject)
+<<<<<<< HEAD
 		if err != nil {
 			ginkgo.Fail(fmt.Sprintf("Unable to create test instance: %v", err))
 		}
@@ -65,10 +75,17 @@ var _ = ginkgo.Describe("NPD should export Prometheus metrics.", func() {
 		if err != nil {
 			ginkgo.Fail(fmt.Sprintf("Unable to setup NPD: %v", err))
 		}
+=======
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unable to create test instance: %v", err))
+
+		err = npd.SetupNPD(instance, *npdBuildTar)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unable to setup NPD: %v", err))
+>>>>>>> v0.8.10
 	})
 
 	ginkgo.Context("On a clean node", func() {
 
+<<<<<<< HEAD
 		ginkgo.It("NPD should export host_uptime metric", func() {
 			err := npd.WaitForNPD(instance, []string{"host_uptime"}, 120)
 			if err != nil {
@@ -84,15 +101,120 @@ var _ = ginkgo.Describe("NPD should export Prometheus metrics.", func() {
 				ginkgo.Fail(fmt.Sprintf("Failed to find uptime metric: %v.\nHere is all NPD exported metrics: %v",
 					err, gotMetrics))
 			}
+=======
+		ginkgo.It("NPD should export cpu/disk/host/memory metric", func() {
+			err := npd.WaitForNPD(instance, []string{"host_uptime"}, 120)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Expect NPD to become ready in 120s, but hit error: %v", err))
+
+			gotMetrics, err := npd.FetchNPDMetrics(instance)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error fetching NPD metrics: %v", err))
+
+			assertMetricExist(gotMetrics, "cpu_runnable_task_count", map[string]string{}, true)
+			assertMetricExist(gotMetrics, "cpu_usage_time", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "cpu_load_1m", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "cpu_load_5m", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "cpu_load_15m", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "disk_operation_count", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "disk_merged_operation_count", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "disk_operation_bytes_count", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "disk_operation_time", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "disk_bytes_used", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "disk_io_time", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "disk_weighted_io", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "memory_bytes_used", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "memory_anonymous_used", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "memory_page_cache_used", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "memory_unevictable_used", map[string]string{}, true)
+			assertMetricExist(gotMetrics, "memory_dirty_used", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "host_uptime", map[string]string{}, false)
+			assertMetricExist(gotMetrics, "system_os_feature", map[string]string{}, false)
+		})
+
+		ginkgo.It("NPD should not report any problem", func() {
+			err := npd.WaitForNPD(instance, []string{"problem_gauge"}, 120)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Expect NPD to become ready in 120s, but hit error: %v", err))
+
+			assertMetricValueInBound(instance,
+				"problem_gauge", map[string]string{"reason": "DockerHung", "type": "KernelDeadlock"},
+				0.0, 0.0)
+			assertMetricValueInBound(instance,
+				"problem_counter", map[string]string{"reason": "DockerHung"},
+				0.0, 0.0)
+			assertMetricValueInBound(instance,
+				"problem_counter", map[string]string{"reason": "FilesystemIsReadOnly"},
+				0.0, 0.0)
+			assertMetricValueInBound(instance,
+				"problem_counter", map[string]string{"reason": "KernelOops"},
+				0.0, 0.0)
+			assertMetricValueInBound(instance,
+				"problem_counter", map[string]string{"reason": "OOMKilling"},
+				0.0, 0.0)
+		})
+	})
+
+	ginkgo.Context("When ext4 filesystem error happens", func() {
+
+		ginkgo.BeforeEach(func() {
+			err := npd.WaitForNPD(instance, []string{"problem_gauge"}, 120)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Expect NPD to become ready in 120s, but hit error: %v", err))
+			// This will trigger a ext4 error on the boot disk, causing the boot disk mounted as read-only and systemd-journald crashing.
+			instance.RunCommandOrFail("sudo /home/kubernetes/bin/problem-maker --problem Ext4FilesystemError")
+		})
+
+		ginkgo.It("NPD should update problem_counter{reason:Ext4Error} and problem_gauge{type:ReadonlyFilesystem}", func() {
+			time.Sleep(5 * time.Second)
+			assertMetricValueAtLeast(instance,
+				"problem_counter", map[string]string{"reason": "Ext4Error"},
+				1.0)
+			assertMetricValueInBound(instance,
+				"problem_gauge", map[string]string{"reason": "FilesystemIsReadOnly", "type": "ReadonlyFilesystem"},
+				1.0, 1.0)
+		})
+
+		ginkgo.It("NPD should remain healthy", func() {
+			npdStates := instance.RunCommandOrFail("sudo systemctl show node-problem-detector -p ActiveState -p SubState")
+			Expect(npdStates.Stdout).To(ContainSubstring("ActiveState=active"), "NPD is no longer active: %v", npdStates)
+			Expect(npdStates.Stdout).To(ContainSubstring("SubState=running"), "NPD is no longer running: %v", npdStates)
+		})
+	})
+
+	ginkgo.Context("When OOM kills and docker hung happen", func() {
+
+		ginkgo.BeforeEach(func() {
+			err := npd.WaitForNPD(instance, []string{"problem_gauge"}, 120)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Expect NPD to become ready in 120s, but hit error: %v", err))
+			instance.RunCommandOrFail("sudo /home/kubernetes/bin/problem-maker --problem OOMKill")
+			instance.RunCommandOrFail("sudo /home/kubernetes/bin/problem-maker --problem DockerHung")
+		})
+
+		ginkgo.It("NPD should update problem_counter and problem_gauge", func() {
+			time.Sleep(5 * time.Second)
+			assertMetricValueInBound(instance,
+				"problem_counter", map[string]string{"reason": "DockerHung"},
+				1.0, 1.0)
+			assertMetricValueInBound(instance,
+				"problem_counter", map[string]string{"reason": "TaskHung"},
+				1.0, 1.0)
+			assertMetricValueInBound(instance,
+				"problem_gauge", map[string]string{"reason": "DockerHung", "type": "KernelDeadlock"},
+				1.0, 1.0)
+			assertMetricValueInBound(instance,
+				"problem_counter", map[string]string{"reason": "OOMKilling"},
+				1.0, 1.0)
+>>>>>>> v0.8.10
 		})
 	})
 
 	ginkgo.AfterEach(func() {
 		defer func() {
 			err := instance.DeleteInstance()
+<<<<<<< HEAD
 			if err != nil {
 				ginkgo.Fail(fmt.Sprintf("Failed to clean up the test VM: %v", err))
 			}
+=======
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to clena up the test VM: %v", err))
+>>>>>>> v0.8.10
 		}()
 
 		artifactSubDir := ""
@@ -101,7 +223,11 @@ var _ = ginkgo.Describe("NPD should export Prometheus metrics.", func() {
 			testSubdirName := strings.Replace(testText, " ", "_", -1)
 
 			artifactSubDir = path.Join(*artifactsDir, testSubdirName)
+<<<<<<< HEAD
 			err := os.MkdirAll(artifactSubDir, os.ModeDir|0644)
+=======
+			err := os.MkdirAll(artifactSubDir, os.ModeDir|0755)
+>>>>>>> v0.8.10
 			if err != nil {
 				fmt.Printf("Failed to create sub-directory to hold test artiface for test %s at %s\n",
 					testText, artifactSubDir)
@@ -109,9 +235,48 @@ var _ = ginkgo.Describe("NPD should export Prometheus metrics.", func() {
 			}
 		}
 
+<<<<<<< HEAD
 		errs := npd.SaveTestArtifacts(instance, artifactSubDir)
+=======
+		errs := npd.SaveTestArtifacts(instance, artifactSubDir, config.GinkgoConfig.ParallelNode)
+>>>>>>> v0.8.10
 		if len(errs) != 0 {
 			fmt.Printf("Error storing debugging data to test artifacts: %v", errs)
 		}
 	})
 })
+<<<<<<< HEAD
+=======
+
+func assertMetricExist(metricList []metrics.Float64MetricRepresentation, metricName string, labels map[string]string, strictLabelMatching bool) {
+	_, err := metrics.GetFloat64Metric(metricList, metricName, labels, strictLabelMatching)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to find metric %q: %v.\nHere is all NPD exported metrics: %v", metricName, err, metricList))
+}
+
+func assertValueAtLeast(metricName string, labels map[string]string, value float64, lowBound float64) {
+	Expect(value).Should(BeNumerically(">=", lowBound),
+		"Got value for metric %s with label %v: %v, expect at least %v.", metricName, labels, value, lowBound)
+}
+
+func assertValueAtMost(metricName string, labels map[string]string, value float64, highBound float64) {
+	Expect(value).Should(BeNumerically("<=", highBound),
+		"Got value for metric %s with label %v: %v, expect at most %v.", metricName, labels, value, highBound)
+}
+
+func assertMetricValueInBound(instance gce.Instance, metricName string, labels map[string]string, lowBound float64, highBound float64) {
+	value, err := npd.FetchNPDMetric(instance, metricName, labels)
+	if err != nil {
+		ginkgo.Fail(fmt.Sprintf("Failed to find %s metric with label %v: %v", metricName, labels, err))
+	}
+	assertValueAtLeast(metricName, labels, value, lowBound)
+	assertValueAtMost(metricName, labels, value, highBound)
+}
+
+func assertMetricValueAtLeast(instance gce.Instance, metricName string, labels map[string]string, lowBound float64) {
+	value, err := npd.FetchNPDMetric(instance, metricName, labels)
+	if err != nil {
+		ginkgo.Fail(fmt.Sprintf("Failed to find %s metric with label %v: %v", metricName, labels, err))
+	}
+	assertValueAtLeast(metricName, labels, value, lowBound)
+}
+>>>>>>> v0.8.10

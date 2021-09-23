@@ -120,7 +120,7 @@ func (c *customPluginMonitor) Stop() {
 	c.tomb.Stop()
 }
 
-// monitorLoop is the main loop of log monitor.
+// monitorLoop is the main loop of customPluginMonitor.
 func (c *customPluginMonitor) monitorLoop() {
 	c.initializeStatus()
 
@@ -135,7 +135,7 @@ func (c *customPluginMonitor) monitorLoop() {
 			}
 			glog.V(3).Infof("Receive new plugin result for %s: %+v", c.configPath, result)
 			status := c.generateStatus(result)
-			glog.Infof("New status generated: %+v", status)
+			glog.V(3).Infof("New status generated: %+v", status)
 			c.statusChan <- status
 		case <-c.tomb.Stopping():
 			c.plugin.Stop()
@@ -188,9 +188,10 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 				if condition.Status == types.True && status != types.True {
 					// Scenario 1: Condition status changes from True to False/Unknown
 					newReason = defaultConditionReason
-					if newMessage == "" {
+					if status == types.False {
 						newMessage = defaultConditionMessage
 					} else {
+						// When status unknown, the result's message is important for debug
 						newMessage = result.Message
 					}
 				} else if condition.Status != types.True && status == types.True {
@@ -200,9 +201,10 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 				} else if condition.Status != status {
 					// Scenario 3: Condition status changes from False to Unknown or vice versa
 					newReason = defaultConditionReason
-					if newMessage == "" {
+					if status == types.False {
 						newMessage = defaultConditionMessage
 					} else {
+						// When status unknown, the result's message is important for debug
 						newMessage = result.Message
 					}
 				} else if condition.Status == types.True && status == types.True &&
@@ -264,12 +266,18 @@ func (c *customPluginMonitor) generateStatus(result cpmtypes.Result) *types.Stat
 			}
 		}
 	}
-	return &types.Status{
+
+	status := &types.Status{
 		Source: c.config.Source,
 		// TODO(random-liu): Aggregate events and conditions and then do periodically report.
 		Events:     append(activeProblemEvents, inactiveProblemEvents...),
 		Conditions: c.conditions,
 	}
+	// Log only if condition has changed
+	if len(activeProblemEvents) != 0 || len(inactiveProblemEvents) != 0 {
+		glog.V(0).Infof("New status generated: %+v", status)
+	}
+	return status
 }
 
 func toConditionStatus(s cpmtypes.Status) types.ConditionStatus {

@@ -47,12 +47,14 @@ function install-npd() {
 
   readonly workdir=$(mktemp -d)
   tar -xf "${TARBALL}" --directory "${workdir}"
-  
   echo "Preparing NPD binary directory."
   mkdir -p "${BIN_DIR}"
   mount --bind "${BIN_DIR}" "${BIN_DIR}"
   # Below remount is to work around COS's noexec mount on /home.
   mount -o remount,exec "${BIN_DIR}"
+
+  echo "Stopping NPD"
+  systemctl stop node-problem-detector.service || true
 
   echo "Installing NPD binary."
   cp "${workdir}"/bin/node-problem-detector "${BIN_DIR}"
@@ -67,12 +69,14 @@ function install-npd() {
   echo "Installing NPD systemd service."
   cp "${workdir}"/config/systemd/node-problem-detector-metric-only.service /etc/systemd/system/node-problem-detector.service
 
+  echo "Installing problem maker binary, used only for e2e testing."
+  cp "${workdir}"/test/bin/problem-maker "${BIN_DIR}"
+
   rm -rf "${workdir}"
 
   # Start systemd service.
   echo "Starting NPD systemd service."
   systemctl daemon-reload
-  systemctl stop node-problem-detector.service || true
   systemctl start node-problem-detector.service
 }
 
@@ -92,6 +96,5 @@ while getopts "t:" opt; do
   esac
 done
 shift "$((OPTIND-1))"
-
 
 main "${@}"

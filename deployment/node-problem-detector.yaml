@@ -14,14 +14,22 @@ spec:
       labels:
         app: node-problem-detector
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
       containers:
       - name: node-problem-detector
         command:
         - /node-problem-detector
         - --logtostderr
-        - --system-log-monitors=/config/kernel-monitor.json,/config/docker-monitor.json
-        - --custom-plugin-monitors=/config/fd-problem-monitor.json
-        image: registry.cn-beijing.aliyuncs.com/acs/node-problem-detector:v0.8.0-5c2f8c9
+        - --config.system-log-monitor=/config/kernel-monitor.json,/config/docker-monitor.json
+        image: k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.7
         resources:
           limits:
             cpu: 10m
@@ -71,3 +79,8 @@ spec:
             path: kernel-monitor.json
           - key: docker-monitor.json
             path: docker-monitor.json
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
