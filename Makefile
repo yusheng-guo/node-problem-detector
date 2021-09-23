@@ -263,6 +263,9 @@ build-in-docker: clean docker-builder
 		-v `pwd`:/gopath/src/k8s.io/node-problem-detector/ npd-builder:latest bash \
 		-c 'cd /gopath/src/k8s.io/node-problem-detector/ && make build-binaries'
 
+build-container-with-dind-binaries: build-in-docker Dockerfile
+	docker build -t $(IMAGE) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg LOGCOUNTER=$(LOGCOUNTER) .
+
 push-container: build-container
 	gcloud auth configure-docker
 	docker push $(IMAGE)
