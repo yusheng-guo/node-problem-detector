@@ -24,6 +24,7 @@ RUN go version
 RUN go get github.com/tools/godep
 RUN godep version
 ADD ./ /gopath/k8s.io/node-problem-detector/
+WORKDIR /gopath/k8s.io/node-problem-detector/
 RUN make build-binaries
 
 # Copyright 2016 The Kubernetes Authors All rights reserved.
