@@ -13,8 +13,8 @@
 # limitations under the License.
 ARG BUILDER_BASE_IMAGE
 
-FROM {BUILDER_BASE_IMAGE} AS builder
-LABEL maintainer="Andy Xie <andy.xning@gmail.com>"
+FROM ${BUILDER_BASE_IMAGE} AS builder
+LABEL maintainer="Ringtail <zhongwei.lzw@alibaba-inc.com>"
 
 ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
