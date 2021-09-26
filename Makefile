@@ -75,6 +75,7 @@ endif
 # Debian Stretch. It includes systemd 232 with support for both +XZ and +LZ4
 # compression. +LZ4 is needed on some os distros such as COS.
 BASEIMAGE:=k8s.gcr.io/debian-base-amd64:v2.0.0
+BUILDER_BASE_IMAGE:=golang:1.17.1-buster
 
 # Disable cgo by default to make the binary statically linked.
 CGO_ENABLED:=0
@@ -264,7 +265,7 @@ build-in-docker: clean docker-builder
 		-c 'cd /gopath/src/k8s.io/node-problem-detector/ && make build-binaries'
 
 build-multi-stage: clean
-	docker build -t $(IMAGE) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg LOGCOUNTER=$(LOGCOUNTER) .
+	docker build -t $(IMAGE) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg LOGCOUNTER=$(LOGCOUNTER) -f Dockerfile.dind --build-arg BUILDER_BASE_IMAGE=$(BUILDER_BASE_IMAGE) .
 
 push-container: build-container
 	gcloud auth configure-docker
