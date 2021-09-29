@@ -26,6 +26,8 @@ ADD ./bin/node-problem-detector /node-problem-detector
 ARG LOGCOUNTER
 COPY ./bin/health-checker ${LOGCOUNTER} /home/kubernetes/bin/
 
+ADD lib/libsystemd-shared-239.so /lib/x86_64-linux-gnu/libsystemd-shared-239.so
+
 COPY config /config
 RUN chmod +x /config/plugin/*.sh
 ENTRYPOINT ["/node-problem-detector", "--config.system-log-monitor=/config/kernel-monitor.json"]
