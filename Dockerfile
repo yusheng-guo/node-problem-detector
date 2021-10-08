@@ -26,8 +26,8 @@ ADD ./bin/node-problem-detector /node-problem-detector
 ARG LOGCOUNTER
 COPY ./bin/health-checker ${LOGCOUNTER} /home/kubernetes/bin/
 
-#ADD lib/libsystemd-shared-239.so /lib/x86_64-linux-gnu/libsystemd-shared-239.so
-#ADD lib/libip4tc.so.2.0.0 /lib/x86_64-linux-gnu/libip4tc.so.2
+ADD lib/libsystemd-shared-239.so /lib/x86_64-linux-gnu/libsystemd-shared-239.so
+ADD lib/libip4tc.so.2.0.0 /lib/x86_64-linux-gnu/libip4tc.so.2
 
 COPY config /config
 RUN chmod +x /config/plugin/*.sh
