@@ -31,7 +31,7 @@ ADD lib/libip4tc.so.2.0.0 /lib64/libip4tc.so.2
 ADD lib/libcryptsetup.so.12.6.0 /lib64/libcryptsetup.so.12
 ADD lib/libpcap.so.1.9.1 /lib64/libpcap.so.1
 ADD lib/libseccomp.so.2.4.3 /lib64/libseccomp.so.2
-ADD liblibdevmapper.so.1.02 /lib64/libdevmapper.so.1.02
+ADD lib/libdevmapper.so.1.02 /lib64/libdevmapper.so.1.02
 
 COPY config /config
 RUN chmod +x /config/plugin/*.sh
