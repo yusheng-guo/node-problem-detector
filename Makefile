@@ -72,9 +72,9 @@ endif
 
 # TODO(random-liu): Support different architectures.
 # The debian-base:v1.0.0 image built from kubernetes repository is based on
-# Debian Stretch. It includes systemd 232 with support for both +XZ and +LZ4
+# Debian Stretch. It includes systemd 239 with support for both +XZ and +LZ4
 # compression. +LZ4 is needed on some os distros such as COS.
-BASEIMAGE:=k8s.gcr.io/debian-base-amd64:v2.0.0
+BASEIMAGE:=registry.cn-hangzhou.aliyuncs.com/alinux/alinux3:3.210714.1
 BUILDER_BASE_IMAGE:=golang:1.17.1-buster
 
 # Disable cgo by default to make the binary statically linked.
