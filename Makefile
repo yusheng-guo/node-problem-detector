@@ -74,7 +74,7 @@ endif
 # The debian-base:v1.0.0 image built from kubernetes repository is based on
 # Debian Stretch. It includes systemd 239 with support for both +XZ and +LZ4
 # compression. +LZ4 is needed on some os distros such as COS.
-BASEIMAGE:=registry.cn-hangzhou.aliyuncs.com/alinux/alinux3:3.210714.1
+BASEIMAGE:=centos:centos8
 BUILDER_BASE_IMAGE:=golang:1.17.1-buster
 
 # Disable cgo by default to make the binary statically linked.
