@@ -18,7 +18,7 @@ FROM ${BASEIMAGE}
 MAINTAINER Random Liu <lantaol@google.com>
 
 #RUN clean-install util-linux libsystemd0 systemd bash lsof curl
-RUN yum install -y systemd-239-45.3.al8
+#RUN yum install -y systemd-239-45.3.al8
 RUN systemctl --version
 
 # Avoid symlink of /etc/localtime.
