@@ -26,5 +26,8 @@ const journaldPluginName = "journald"
 
 func init() {
 	// Register the journald plugin.
+
+	glog.Warningf("DEBUG init journald logwatcher")
+
 	registerLogWatcher(journaldPluginName, journald.NewJournaldWatcher)
 }
