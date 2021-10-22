@@ -20,6 +20,7 @@ package logwatchers
 
 import (
 	"k8s.io/node-problem-detector/pkg/systemlogmonitor/logwatchers/journald"
+	"github.com/golang/glog"
 )
 
 const journaldPluginName = "journald"
