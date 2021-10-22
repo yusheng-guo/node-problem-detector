@@ -22,7 +22,7 @@ ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
 ENV ENABLE_JOURNALD 1
 
-RUN apt-get update && apt-get --yes install libsystemd-dev
+RUN apt-get update && apt-get --yes install libsystemd-dev gcc
 RUN go version
 RUN go get github.com/tools/godep
 RUN godep version
