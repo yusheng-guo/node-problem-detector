@@ -14,13 +14,14 @@
 ARG BUILDER_BASE_IMAGE
 ARG BASEIMAGE
 ARG LOGCOUNTER
+ARG LINUX_PLATFORMS
+ARG ENABLE_JOURNALD
 
 FROM ${BUILDER_BASE_IMAGE} AS builder
 LABEL maintainer="Ringtail <zhongwei.lzw@alibaba-inc.com>"
 
 ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
-# ENV ENABLE_JOURNALD 1
 
 RUN apt-get update && apt-get --yes install libsystemd-dev gcc
 RUN go version
