@@ -22,6 +22,8 @@ LABEL maintainer="Ringtail <zhongwei.lzw@alibaba-inc.com>"
 
 ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
+ENV ENABLE_JOURNALD ${ENABLE_JOURNALD}
+ENV LINUX_PLATFORMS ${LINUX_PLATFORMS}
 
 RUN apt-get update && apt-get --yes install libsystemd-dev gcc
 RUN go version
