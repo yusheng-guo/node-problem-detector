@@ -17,7 +17,7 @@ FROM ${BASEIMAGE}
 
 MAINTAINER Random Liu <lantaol@google.com>
 
-RUN systemctl --version
+#RUN clean-install util-linux libsystemd0 systemd bash lsof curl
 
 # Avoid symlink of /etc/localtime.
 RUN test -h /etc/localtime && rm -f /etc/localtime && cp /usr/share/zoneinfo/UTC /etc/localtime || true
@@ -25,6 +25,13 @@ RUN test -h /etc/localtime && rm -f /etc/localtime && cp /usr/share/zoneinfo/UTC
 ADD ./bin/node-problem-detector /node-problem-detector
 ARG LOGCOUNTER
 COPY ./bin/health-checker ${LOGCOUNTER} /home/kubernetes/bin/
+
+ADD lib/libsystemd-shared-239.so /lib64/libsystemd-shared-239.so
+ADD lib/libip4tc.so.2.0.0 /lib64/libip4tc.so.2
+ADD lib/libcryptsetup.so.12.6.0 /lib64/libcryptsetup.so.12
+ADD lib/libpcap.so.1.9.1 /lib64/libpcap.so.1
+ADD lib/libseccomp.so.2.4.3 /lib64/libseccomp.so.2
+ADD lib/libdevmapper.so.1.02 /lib64/libdevmapper.so.1.02
 
 COPY config /config
 RUN chmod +x /config/plugin/*.sh

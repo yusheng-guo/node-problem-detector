@@ -22,7 +22,7 @@
 all: build
 
 # PLATFORMS is the set of OS_ARCH that NPD can build against.
-LINUX_PLATFORMS?=linux_amd64 linux_arm64
+LINUX_PLATFORMS=linux_amd64 linux_arm64
 PLATFORMS=$(LINUX_PLATFORMS) windows_amd64
 
 # VERSION is the version of the binary.
@@ -74,7 +74,7 @@ endif
 # The debian-base:v1.0.0 image built from kubernetes repository is based on
 # Debian Stretch. It includes systemd 239 with support for both +XZ and +LZ4
 # compression. +LZ4 is needed on some os distros such as COS.
-BASEIMAGE:=centos:centos8
+BASEIMAGE:=registry.cn-hangzhou.aliyuncs.com/alinux/alinux3:3.210714.1
 BUILDER_BASE_IMAGE:=golang:1.17.1-buster
 
 # Disable cgo by default to make the binary statically linked.
@@ -245,10 +245,10 @@ $(NPD_NAME_VERSION)-%.tar.gz: $(ALL_BINARIES) test/e2e-install.sh
 build-binaries: $(ALL_BINARIES)
 
 build-container: build-binaries Dockerfile
-	docker build -t $(IMAGE) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg LOGCOUNTER=$(LOGCOUNTER) . --progress=plain --no-cache
+	docker build -t $(IMAGE) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg LOGCOUNTER=$(LOGCOUNTER) .
 
-$(TARBALL): ./bin/node-problem-odetector ./bin/log-counter ./bin/health-checker ./test/bin/problem-maker
-                                	tar -zcvf $(TARBALL) bin/ cnfig/ test/e2e-install.sh test/bin/problem-maker
+$(TARBALL): ./bin/node-problem-detector ./bin/log-counter ./bin/health-checker ./test/bin/problem-maker
+	tar -zcvf $(TARBALL) bin/ config/ test/e2e-install.sh test/bin/problem-maker
 	sha1sum $(TARBALL)
 	md5sum $(TARBALL)
 
