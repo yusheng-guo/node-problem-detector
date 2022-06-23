@@ -15,8 +15,8 @@ data:
             },
             {
                 "type": "ReadonlyFilesystem",
-                "reason": "FilesystemIsReadOnly",
-                "message": "Filesystem is read-only"
+                "reason": "FilesystemIsNotReadOnly",
+                "message": "Filesystem is not read-only"
             }
         ],
         "rules": [
@@ -46,10 +46,9 @@ data:
                 "pattern": "divide error: 0000 \\[#\\d+\\] SMP"
             },
             {
-                "type": "permanent",
-                "condition": "KernelDeadlock",
-                "reason": "AUFSUmountHung",
-                "pattern": "task umount\\.aufs:\\w+ blocked for more than \\w+ seconds\\."
+    			"type": "temporary",
+    			"reason": "MemoryReadError",
+    			"pattern": "CE memory read error .*"
             },
             {
                 "type": "permanent",

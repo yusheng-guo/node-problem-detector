@@ -21,12 +21,12 @@
 		{
 			"type": "temporary",
 			"reason": "OOMKilling",
-			"pattern": "Kill process \\d+ (.+) score \\d+ or sacrifice child\\nKilled process \\d+ (.+) total-vm:\\d+kB, anon-rss:\\d+kB, file-rss:\\d+kB.*"
+			"pattern": "Killed process \\d+ (.+) total-vm:\\d+kB, anon-rss:\\d+kB, file-rss:\\d+kB.*"
 		},
 		{
 			"type": "temporary",
 			"reason": "TaskHung",
-			"pattern": "task \\S+:\\w+ blocked for more than \\w+ seconds\\."
+			"pattern": "task [\\S ]+:\\w+ blocked for more than \\w+ seconds\\."
 		},
 		{
 			"type": "temporary",
@@ -44,10 +44,24 @@
 			"pattern": "divide error: 0000 \\[#\\d+\\] SMP"
 		},
 		{
-			"type": "permanent",
-			"condition": "KernelDeadlock",
-			"reason": "AUFSUmountHung",
-			"pattern": "task umount\\.aufs:\\w+ blocked for more than \\w+ seconds\\."
+			"type": "temporary",
+			"reason": "Ext4Error",
+			"pattern": "EXT4-fs error .*"
+		},
+		{
+			"type": "temporary",
+			"reason": "Ext4Warning",
+			"pattern": "EXT4-fs warning .*"
+		},
+		{
+			"type": "temporary",
+			"reason": "IOError",
+			"pattern": "Buffer I/O error .*"
+		},
+		{
+			"type": "temporary",
+			"reason": "MemoryReadError",
+			"pattern": "CE memory read error .*"
 		},
 		{
 			"type": "permanent",

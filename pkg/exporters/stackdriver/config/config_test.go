@@ -25,6 +25,7 @@ import (
 
 func TestApplyConfiguration(t *testing.T) {
 	testCases := []struct {
+<<<<<<< HEAD
 		name          string
 		orignalConfig StackdriverExporterConfig
 		wantedConfig  StackdriverExporterConfig
@@ -32,6 +33,15 @@ func TestApplyConfiguration(t *testing.T) {
 		{
 			name: "normal",
 			orignalConfig: StackdriverExporterConfig{
+=======
+		name           string
+		originalConfig StackdriverExporterConfig
+		wantedConfig   StackdriverExporterConfig
+	}{
+		{
+			name: "normal",
+			originalConfig: StackdriverExporterConfig{
+>>>>>>> v0.8.10
 				ExportPeriod:          "60s",
 				MetadataFetchTimeout:  "600s",
 				MetadataFetchInterval: "10s",
@@ -58,7 +68,11 @@ func TestApplyConfiguration(t *testing.T) {
 		},
 		{
 			name: "staging API endpoint",
+<<<<<<< HEAD
 			orignalConfig: StackdriverExporterConfig{
+=======
+			originalConfig: StackdriverExporterConfig{
+>>>>>>> v0.8.10
 				ExportPeriod:          "60s",
 				MetadataFetchTimeout:  "600s",
 				MetadataFetchInterval: "10s",
@@ -84,8 +98,13 @@ func TestApplyConfiguration(t *testing.T) {
 			},
 		},
 		{
+<<<<<<< HEAD
 			name:          "empty",
 			orignalConfig: StackdriverExporterConfig{},
+=======
+			name:           "empty",
+			originalConfig: StackdriverExporterConfig{},
+>>>>>>> v0.8.10
 			wantedConfig: StackdriverExporterConfig{
 				ExportPeriod:          "1m0s",
 				MetadataFetchTimeout:  "10m0s",
@@ -98,9 +117,15 @@ func TestApplyConfiguration(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+<<<<<<< HEAD
 			test.orignalConfig.ApplyConfiguration()
 			if !reflect.DeepEqual(test.orignalConfig, test.wantedConfig) {
 				t.Errorf("Wanted: %+v. \nGot: %+v", test.wantedConfig, test.orignalConfig)
+=======
+			test.originalConfig.ApplyConfiguration()
+			if !reflect.DeepEqual(test.originalConfig, test.wantedConfig) {
+				t.Errorf("Wanted: %+v. \nGot: %+v", test.wantedConfig, test.originalConfig)
+>>>>>>> v0.8.10
 			}
 		})
 	}
