@@ -19,7 +19,12 @@ package systemlogmonitor
 import (
 	"encoding/json"
 	"io/ioutil"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/heapster/common/kubernetes"
 	"k8s.io/node-problem-detector/cmd/options"
 	"net/url"
@@ -27,6 +32,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"fmt"
 	"time"
@@ -54,6 +60,7 @@ const (
 var (
 	uuidRegx  *regexp.Regexp
 	k8sClient *clientset.Clientset
+	nodeName  string
 )
 
 func init() {
@@ -69,14 +76,18 @@ func init() {
 }
 
 type logMonitor struct {
-	configPath string
-	watcher    watchertypes.LogWatcher
-	buffer     LogBuffer
-	config     MonitorConfig
-	conditions []types.Condition
-	logCh      <-chan *logtypes.Log
-	output     chan *types.Status
-	tomb       *tomb.Tomb
+	configPath    string
+	watcher       watchertypes.LogWatcher
+	buffer        LogBuffer
+	config        MonitorConfig
+	conditions    []types.Condition
+	logCh         <-chan *logtypes.Log
+	output        chan *types.Status
+	tomb          *tomb.Tomb
+	podList       []v1.Pod
+	rwLock        sync.RWMutex
+	listOptions   metav1.ListOptions
+	listerWatcher v12.PodInterface
 }
 
 func InitK8sClientOrDie(options *options.NodeProblemDetectorOptions) *clientset.Clientset {
@@ -87,6 +98,7 @@ func InitK8sClientOrDie(options *options.NodeProblemDetectorOptions) *clientset.
 	}
 	cfg.UserAgent = fmt.Sprintf("%s/%s", filepath.Base(os.Args[0]), version.Version())
 	k8sClient = clientset.NewForConfigOrDie(cfg)
+	nodeName = options.NodeName
 	return k8sClient
 }
 
@@ -95,6 +107,12 @@ func NewLogMonitorOrDie(configPath string) types.Monitor {
 	l := &logMonitor{
 		configPath: configPath,
 		tomb:       tomb.NewTomb(),
+		rwLock:     sync.RWMutex{},
+		listOptions: metav1.ListOptions{
+			FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
+			ResourceVersion: "0",
+		},
+		listerWatcher: k8sClient.CoreV1().Pods(""),
 	}
 
 	f, err := ioutil.ReadFile(configPath)
@@ -149,6 +167,7 @@ func (l *logMonitor) Start() (<-chan *types.Status, error) {
 	if err != nil {
 		return nil, err
 	}
+	go l.listAndWatch()
 	go l.monitorLoop()
 	return l.output, nil
 }
@@ -202,32 +221,32 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 	// We use the timestamp of the first log line as the timestamp of the status.
 	timestamp := logs[0].Timestamp
 	message := generateMessage(logs)
-	if rule.Reason == OOMREASON && k8sClient != nil {
+	if rule.Reason == OOMREASON && l.listerWatcher != nil {
 		uuid := string(uuidRegx.Find([]byte(message)))
-
 		uuid = strings.ReplaceAll(uuid, "_", "-")
-		pl, err := k8sClient.CoreV1().Pods("").List(metav1.ListOptions{})
-		if err != nil {
-			glog.Error("Error in getting pods: %v", err.Error())
-		} else {
-			for _, pod := range pl.Items {
-				if string(pod.UID) == uuid {
-					message = fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
-						pod.Spec.NodeName, pod.Name, pod.Namespace, uuid)
-					break
-				}
+
+		// visit cache to get podList
+		l.rwLock.RLock()
+		// if cache is empty, list pods
+		if l.podList == nil || len(l.podList) <= 0 {
+			if err := l.list(); err != nil {
+				glog.Errorf("Failed to list pods, err:%v", err)
 			}
 		}
+
+		message = l.generateOOMMessage(uuid)
+		l.rwLock.RUnlock()
 	}
+
 	var events []types.Event
 	var changedConditions []*types.Condition
 	if rule.Type == types.Temp {
 		// For temporary error only generate event
 		events = append(events, types.Event{
-			Severity:   types.Warn,
-			Timestamp:  timestamp,
-			Reason:     rule.Reason,
-			Message:    message,
+			Severity:  types.Warn,
+			Timestamp: timestamp,
+			Reason:    rule.Reason,
+			Message:   message,
 		})
 	} else {
 		// For permanent error changes the condition
@@ -291,6 +310,95 @@ func (l *logMonitor) initializeStatus() {
 		Source:     l.config.Source,
 		Conditions: l.conditions,
 	}
+}
+
+// listAndWatch watch and watch handle.
+func (l *logMonitor) listAndWatch() {
+	if err := l.list(); err != nil {
+		glog.Errorf("Failed to init podList, err:%v", err)
+	}
+
+	for {
+		w, err := l.listerWatcher.Watch(l.listOptions)
+		if err != nil {
+			glog.Errorf("Failed to watch pod, err:%v", err)
+			return
+		}
+
+		select {
+		case event := <-w.ResultChan():
+			switch event.Type {
+			case watch.Added:
+				if err := l.list(); err != nil {
+					glog.Errorf("Failed to list pods, err:%v", err)
+				}
+				w.Stop()
+			case watch.Modified:
+				if err := l.list(); err != nil {
+					glog.Errorf("Failed to list pods, err:%v", err)
+				}
+				w.Stop()
+			case watch.Deleted:
+				if err := l.list(); err != nil {
+					glog.Errorf("Failed to list pods, err:%v", err)
+				}
+				w.Stop()
+			default:
+				glog.Errorf("Invalid watch event %v", event.Type)
+				w.Stop()
+			}
+		case <-l.tomb.Stopping():
+			w.Stop()
+			glog.Infof("Log monitor stopped at %s", time.Now().Format("2006-01-02 15:04:05 MST Mon"))
+			return
+		}
+	}
+}
+
+// syncWith sync logMonitor's podList cache.
+// write lock inside.
+func (l *logMonitor) syncWith(obj runtime.Object, resourceVersion string) error {
+	list, ok := obj.(*v1.PodList)
+	if !ok {
+		return fmt.Errorf("cannot convert obj %v to podList", obj)
+	}
+
+	l.rwLock.Lock()
+	defer l.rwLock.Unlock()
+	l.podList = list.Items
+	l.listOptions.ResourceVersion = resourceVersion
+	return nil
+}
+
+// list lists pods with FieldSelector and resourceVersion.
+func (l *logMonitor) list() error {
+	var (
+		list              runtime.Object
+		err               error
+		listMetaInterface meta.List
+	)
+	if list, err = l.listerWatcher.List(l.listOptions); err != nil {
+		return err
+	}
+	if listMetaInterface, err = meta.ListAccessor(list); err != nil {
+		return err
+	}
+	resourceVersion := listMetaInterface.GetResourceVersion()
+
+	err = l.syncWith(list, resourceVersion)
+	return err
+}
+
+// generateOOMMessage get oom pod message.
+// need read lock before use.
+func (l *logMonitor) generateOOMMessage(uuid string) string {
+	for _, pod := range l.podList {
+		if string(pod.UID) == uuid {
+			return fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
+				pod.Spec.NodeName, pod.Name, pod.Namespace, uuid)
+		}
+	}
+	return ""
 }
 
 func initialConditions(defaults []types.Condition) []types.Condition {
