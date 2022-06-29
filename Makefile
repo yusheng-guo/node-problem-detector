@@ -247,8 +247,8 @@ build-binaries: $(ALL_BINARIES)
 build-container: build-binaries Dockerfile
 	docker build -t $(IMAGE) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg LOGCOUNTER=$(LOGCOUNTER) . --progress=plain --no-cache
 
-$(TARBALL): ./bin/node-problem-odetector ./bin/log-counter ./bin/health-checker ./test/bin/problem-maker
-                                	tar -zcvf $(TARBALL) bin/ cnfig/ test/e2e-install.sh test/bin/problem-maker
+$(TARBALL): ./bin/node-problem-detector ./bin/log-counter ./bin/health-checker ./test/bin/problem-maker
+	tar -zcvf $(TARBALL) bin/ config/ test/e2e-install.sh test/bin/problem-maker
 	sha1sum $(TARBALL)
 	md5sum $(TARBALL)
 
