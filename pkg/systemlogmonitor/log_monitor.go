@@ -112,7 +112,6 @@ func NewLogMonitorOrDie(configPath string) types.Monitor {
 			FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
 			ResourceVersion: "0",
 		},
-		listerWatcher: k8sClient.CoreV1().Pods(""),
 	}
 
 	f, err := ioutil.ReadFile(configPath)
@@ -163,6 +162,7 @@ func initializeProblemMetricsOrDie(rules []systemlogtypes.Rule) {
 func (l *logMonitor) Start() (<-chan *types.Status, error) {
 	glog.Infof("Start log monitor %s", l.configPath)
 	var err error
+	l.listerWatcher = k8sClient.CoreV1().Pods("")
 	l.logCh, err = l.watcher.Watch()
 	if err != nil {
 		return nil, err
