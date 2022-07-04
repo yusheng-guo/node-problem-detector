@@ -415,7 +415,7 @@ func (l *logMonitor) generateOOMMessage(uuid string) string {
 				pod.Spec.NodeName, pod.Name, pod.Namespace, uuid)
 		}
 	}
-	return ""
+	return fmt.Sprintf("pod was OOM killed. node:%s pod:Unknow namespace:Unknow uuid:%s", nodeName, uuid)
 }
 
 func initialConditions(defaults []types.Condition) []types.Condition {
