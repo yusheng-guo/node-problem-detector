@@ -109,12 +109,7 @@ func NewLogMonitorOrDie(configPath string) types.Monitor {
 		configPath: configPath,
 		tomb:       tomb.NewTomb(),
 		rwLock:     sync.RWMutex{},
-		listOptions: metav1.ListOptions{
-			FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
-			ResourceVersion: "0",
-			TimeoutSeconds:  &podEventTimeout,
-		},
-		podList: make([]v1.Pod, 0),
+		podList:    make([]v1.Pod, 0),
 	}
 
 	f, err := ioutil.ReadFile(configPath)
@@ -165,7 +160,16 @@ func initializeProblemMetricsOrDie(rules []systemlogtypes.Rule) {
 func (l *logMonitor) Start() (<-chan *types.Status, error) {
 	glog.Infof("Start log monitor %s", l.configPath)
 	var err error
+
+	// init listAndWatcher
 	l.listerWatcher = k8sClient.CoreV1().Pods("")
+	l.listOptions = metav1.ListOptions{
+		FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
+		ResourceVersion: "0",
+		TimeoutSeconds:  &podEventTimeout,
+	}
+	glog.V(4).Infof("init k8sClient %v and listOptions %v on node %s", l.listerWatcher, l.listOptions, nodeName)
+
 	l.logCh, err = l.watcher.Watch()
 	if err != nil {
 		return nil, err
@@ -331,26 +335,31 @@ func (l *logMonitor) listAndWatch() {
 			glog.Errorf("Failed to watch pod, err:%v", err)
 			return
 		}
+		glog.V(4).Infof("Start watch pod on Node %s", nodeName)
 
 		select {
 		case event := <-w.ResultChan():
 			switch event.Type {
 			case watch.Added:
+				glog.V(4).Infof("Watch event Added")
 				if err = l.list(); err != nil {
 					glog.Errorf("Failed to list pods, err:%v", err)
 				}
 				w.Stop()
 			case watch.Modified:
+				glog.V(4).Infof("Watch event Modified")
 				if err = l.list(); err != nil {
 					glog.Errorf("Failed to list pods, err:%v", err)
 				}
 				w.Stop()
 			case watch.Deleted:
+				glog.V(4).Infof("Watch event Deleted")
 				if err = l.list(); err != nil {
 					glog.Errorf("Failed to list pods, err:%v", err)
 				}
 				w.Stop()
 			default:
+				glog.V(4).Infof("Watch event %v", event.Type)
 				// glog.Errorf("Invalid watch event %v", event.Type)
 				w.Stop()
 			}
@@ -374,6 +383,7 @@ func (l *logMonitor) syncWith(obj runtime.Object, resourceVersion string) error 
 	defer l.rwLock.Unlock()
 	l.podList = list.Items
 	l.listOptions.ResourceVersion = resourceVersion
+	glog.V(4).Infof("syncWith logMonitor cache, length of podList: %v", len(l.podList))
 	return nil
 }
 
@@ -399,8 +409,6 @@ func (l *logMonitor) list() error {
 // generateOOMMessage get oom pod message.
 // need read lock before use.
 func (l *logMonitor) generateOOMMessage(uuid string) string {
-	l.rwLock.RLock()
-	defer l.rwLock.RUnlock()
 	for _, pod := range l.podList {
 		if string(pod.UID) == uuid {
 			return fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
