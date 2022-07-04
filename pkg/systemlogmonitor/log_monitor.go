@@ -58,9 +58,10 @@ const (
 )
 
 var (
-	uuidRegx  *regexp.Regexp
-	k8sClient *clientset.Clientset
-	nodeName  string
+	uuidRegx        *regexp.Regexp
+	k8sClient       *clientset.Clientset
+	nodeName        string
+	podEventTimeout = int64(3) // 3 minutes
 )
 
 func init() {
@@ -111,6 +112,7 @@ func NewLogMonitorOrDie(configPath string) types.Monitor {
 		listOptions: metav1.ListOptions{
 			FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
 			ResourceVersion: "0",
+			TimeoutSeconds:  &podEventTimeout,
 		},
 	}
 
@@ -344,7 +346,7 @@ func (l *logMonitor) listAndWatch() {
 				}
 				w.Stop()
 			default:
-				glog.Errorf("Invalid watch event %v", event.Type)
+				// glog.Errorf("Invalid watch event %v", event.Type)
 				w.Stop()
 			}
 		case <-l.tomb.Stopping():
