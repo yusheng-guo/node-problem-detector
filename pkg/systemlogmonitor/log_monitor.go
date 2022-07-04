@@ -114,6 +114,7 @@ func NewLogMonitorOrDie(configPath string) types.Monitor {
 			ResourceVersion: "0",
 			TimeoutSeconds:  &podEventTimeout,
 		},
+		podList: make([]v1.Pod, 0),
 	}
 
 	f, err := ioutil.ReadFile(configPath)
@@ -240,6 +241,10 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 		l.rwLock.RUnlock()
 	}
 
+	if l.listerWatcher == nil {
+		glog.Errorf("Empty ListAndWatcher!")
+	}
+
 	var events []types.Event
 	var changedConditions []*types.Condition
 	if rule.Type == types.Temp {
@@ -331,17 +336,17 @@ func (l *logMonitor) listAndWatch() {
 		case event := <-w.ResultChan():
 			switch event.Type {
 			case watch.Added:
-				if err := l.list(); err != nil {
+				if err = l.list(); err != nil {
 					glog.Errorf("Failed to list pods, err:%v", err)
 				}
 				w.Stop()
 			case watch.Modified:
-				if err := l.list(); err != nil {
+				if err = l.list(); err != nil {
 					glog.Errorf("Failed to list pods, err:%v", err)
 				}
 				w.Stop()
 			case watch.Deleted:
-				if err := l.list(); err != nil {
+				if err = l.list(); err != nil {
 					glog.Errorf("Failed to list pods, err:%v", err)
 				}
 				w.Stop()
@@ -394,6 +399,8 @@ func (l *logMonitor) list() error {
 // generateOOMMessage get oom pod message.
 // need read lock before use.
 func (l *logMonitor) generateOOMMessage(uuid string) string {
+	l.rwLock.RLock()
+	defer l.rwLock.RUnlock()
 	for _, pod := range l.podList {
 		if string(pod.UID) == uuid {
 			return fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
