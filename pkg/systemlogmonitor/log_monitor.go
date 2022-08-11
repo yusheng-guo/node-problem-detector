@@ -18,13 +18,12 @@ package systemlogmonitor
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/patrickmn/go-cache"
 	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/heapster/common/kubernetes"
 	"k8s.io/node-problem-detector/cmd/options"
 	"net/url"
@@ -32,14 +31,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
-
-	"fmt"
 	"time"
 
 	"github.com/golang/glog"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/node-problem-detector/pkg/problemdaemon"
 	"k8s.io/node-problem-detector/pkg/problemmetrics"
 	"k8s.io/node-problem-detector/pkg/systemlogmonitor/logwatchers"
@@ -58,10 +52,13 @@ const (
 )
 
 var (
-	uuidRegx        *regexp.Regexp
-	k8sClient       *clientset.Clientset
-	nodeName        string
-	podEventTimeout = int64(3) // 3 minutes
+	uuidRegx  *regexp.Regexp
+	k8sClient *clientset.Clientset
+	nodeName  string
+
+	// cache setting
+	cacheExpireDuration  = time.Minute * 30 // cache过期时间为30min
+	cacheCleanupInterval = time.Minute * 60 // cache清理缓存时间为60min
 )
 
 func init() {
@@ -77,18 +74,19 @@ func init() {
 }
 
 type logMonitor struct {
-	configPath    string
-	watcher       watchertypes.LogWatcher
-	buffer        LogBuffer
-	config        MonitorConfig
-	conditions    []types.Condition
-	logCh         <-chan *logtypes.Log
-	output        chan *types.Status
-	tomb          *tomb.Tomb
-	podList       []v1.Pod
-	rwLock        sync.RWMutex
-	listOptions   metav1.ListOptions
-	listerWatcher v12.PodInterface
+	configPath string
+	watcher    watchertypes.LogWatcher
+	buffer     LogBuffer
+	config     MonitorConfig
+	conditions []types.Condition
+	logCh      <-chan *logtypes.Log
+	output     chan *types.Status
+	tomb       *tomb.Tomb
+
+	// cache-key: pod uid
+	// cache-value: pod_name@pod_namespace拼接的字符串
+	// 线程安全, 不需要加锁读写
+	cache *cache.Cache
 }
 
 func InitK8sClientOrDie(options *options.NodeProblemDetectorOptions) *clientset.Clientset {
@@ -108,8 +106,7 @@ func NewLogMonitorOrDie(configPath string) types.Monitor {
 	l := &logMonitor{
 		configPath: configPath,
 		tomb:       tomb.NewTomb(),
-		rwLock:     sync.RWMutex{},
-		podList:    make([]v1.Pod, 0),
+		cache:      cache.New(cacheExpireDuration, cacheCleanupInterval),
 	}
 
 	f, err := ioutil.ReadFile(configPath)
@@ -160,21 +157,10 @@ func initializeProblemMetricsOrDie(rules []systemlogtypes.Rule) {
 func (l *logMonitor) Start() (<-chan *types.Status, error) {
 	glog.Infof("Start log monitor %s", l.configPath)
 	var err error
-
-	// init listAndWatcher
-	l.listerWatcher = k8sClient.CoreV1().Pods("")
-	l.listOptions = metav1.ListOptions{
-		FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
-		ResourceVersion: "0",
-		TimeoutSeconds:  &podEventTimeout,
-	}
-	glog.V(4).Infof("init k8sClient %v and listOptions %v on node %s", l.listerWatcher, l.listOptions, nodeName)
-
 	l.logCh, err = l.watcher.Watch()
 	if err != nil {
 		return nil, err
 	}
-	go l.listAndWatch()
 	go l.monitorLoop()
 	return l.output, nil
 }
@@ -228,25 +214,20 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 	// We use the timestamp of the first log line as the timestamp of the status.
 	timestamp := logs[0].Timestamp
 	message := generateMessage(logs)
-	if rule.Reason == OOMREASON && l.listerWatcher != nil {
+	if rule.Reason == OOMREASON && k8sClient != nil {
 		uuid := string(uuidRegx.Find([]byte(message)))
+
 		uuid = strings.ReplaceAll(uuid, "_", "-")
 
-		// visit cache to get podList
-		l.rwLock.RLock()
-		// if cache is empty, list pods
-		if l.podList == nil || len(l.podList) <= 0 {
-			if err := l.list(); err != nil {
-				glog.Errorf("Failed to list pods, err:%v", err)
-			}
+		// check cache
+		if val, ok := l.cache.Get(uuid); ok {
+			strs := strings.Split(val.(string), "@")
+			message = fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
+				nodeName, strs[0], strs[1], uuid)
+			l.cache.Delete(uuid)
+		} else {
+			message = l.cachePod(uuid)
 		}
-
-		message = l.generateOOMMessage(uuid)
-		l.rwLock.RUnlock()
-	}
-
-	if l.listerWatcher == nil {
-		glog.Errorf("Empty ListAndWatcher!")
 	}
 
 	var events []types.Event
@@ -323,99 +304,94 @@ func (l *logMonitor) initializeStatus() {
 	}
 }
 
-// listAndWatch watch and watch handle.
-func (l *logMonitor) listAndWatch() {
-	if err := l.list(); err != nil {
-		glog.Errorf("Failed to init podList, err:%v", err)
+// 每个node上最多也就60多个pod?
+// 有必要使用分批list的策略吗?
+func (l *logMonitor) cachePod(uuid string) string {
+	msgChan := make(chan string)
+	defer close(msgChan)
+
+	pl, err := k8sClient.CoreV1().Pods("").List(metav1.ListOptions{
+		ResourceVersion: "0",
+		FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
+	})
+	if err != nil {
+		glog.Error("Error in listing pods: %v", err.Error())
+		return ""
 	}
 
-	for {
-		w, err := l.listerWatcher.Watch(l.listOptions)
-		if err != nil {
-			glog.Errorf("Failed to watch pod, err:%v", err)
-			return
-		}
-		glog.V(4).Infof("Start watch pod on Node %s", nodeName)
-
-		select {
-		case event := <-w.ResultChan():
-			switch event.Type {
-			case watch.Added:
-				glog.V(4).Infof("Watch event Added")
-				if err = l.list(); err != nil {
-					glog.Errorf("Failed to list pods, err:%v", err)
-				}
-				w.Stop()
-			case watch.Modified:
-				glog.V(4).Infof("Watch event Modified")
-				if err = l.list(); err != nil {
-					glog.Errorf("Failed to list pods, err:%v", err)
-				}
-				w.Stop()
-			case watch.Deleted:
-				glog.V(4).Infof("Watch event Deleted")
-				if err = l.list(); err != nil {
-					glog.Errorf("Failed to list pods, err:%v", err)
-				}
-				w.Stop()
-			default:
-				glog.V(4).Infof("Watch event %v", event.Type)
-				// glog.Errorf("Invalid watch event %v", event.Type)
-				w.Stop()
+	// update cache
+	go func(pods []v1.Pod) {
+		defer util.Recovery()
+		for _, pod := range pods {
+			if _, ok := l.cache.Get(string(pod.UID)); ok {
+				// todo
+				// 对于那些稳定的[相对稳定，不会OOM的pod]，要不要更新缓存，还是采用一种惰性更新的策略?
+			} else {
+				l.cache.Set(string(pod.UID), fmt.Sprintf("%s@%s", pod.Name, pod.Namespace), cache.DefaultExpiration+util.RandomCacheDuration())
 			}
-		case <-l.tomb.Stopping():
-			w.Stop()
-			glog.Infof("Log monitor stopped at %s", time.Now().Format("2006-01-02 15:04:05 MST Mon"))
+		}
+	}(pl.Items)
+
+	go func(pods []v1.Pod) {
+		defer util.Recovery()
+		for _, pod := range pods {
+			if string(pod.UID) == uuid {
+				l.cache.Delete(uuid)
+				msgChan <- fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
+					pod.Spec.NodeName, pod.Name, pod.Namespace, uuid)
+				return
+			}
+		}
+		msgChan <- ""
+	}(pl.Items)
+
+	select {
+	case msg := <-msgChan:
+		return msg
+	case <-time.After(time.Millisecond * 500):
+		return ""
+	}
+}
+
+func (l *logMonitor) cachePodWithPagination(uuid string) (message string) {
+	var nextToken = ""
+	var step int64 = 50
+
+	// pagination
+	for {
+		pods, err := k8sClient.CoreV1().Pods("").List(metav1.ListOptions{
+			ResourceVersion: "0",
+			FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
+			Limit:           step,
+			Continue:        nextToken,
+		})
+		if err != nil {
+			glog.Error("Error in listing pods: %v", err.Error())
 			return
 		}
-	}
-}
 
-// syncWith sync logMonitor's podList cache.
-// write lock inside.
-func (l *logMonitor) syncWith(obj runtime.Object, resourceVersion string) error {
-	list, ok := obj.(*v1.PodList)
-	if !ok {
-		return fmt.Errorf("cannot convert obj %v to podList", obj)
-	}
+		for _, pod := range pods.Items {
+			if string(pod.UID) == uuid {
+				message = fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
+					pod.Spec.NodeName, pod.Name, pod.Namespace, uuid)
+				continue
+			}
 
-	l.rwLock.Lock()
-	defer l.rwLock.Unlock()
-	l.podList = list.Items
-	l.listOptions.ResourceVersion = resourceVersion
-	glog.V(4).Infof("syncWith logMonitor cache, length of podList: %v", len(l.podList))
-	return nil
-}
+			// cache pod
+			if _, ok := l.cache.Get(string(pod.UID)); ok {
 
-// list lists pods with FieldSelector and resourceVersion.
-func (l *logMonitor) list() error {
-	var (
-		list              runtime.Object
-		err               error
-		listMetaInterface meta.List
-	)
-	if list, err = l.listerWatcher.List(l.listOptions); err != nil {
-		return err
-	}
-	if listMetaInterface, err = meta.ListAccessor(list); err != nil {
-		return err
-	}
-	resourceVersion := listMetaInterface.GetResourceVersion()
-
-	err = l.syncWith(list, resourceVersion)
-	return err
-}
-
-// generateOOMMessage get oom pod message.
-// need read lock before use.
-func (l *logMonitor) generateOOMMessage(uuid string) string {
-	for _, pod := range l.podList {
-		if string(pod.UID) == uuid {
-			return fmt.Sprintf("pod was OOM killed. node:%s pod:%s namespace:%s uuid:%s",
-				pod.Spec.NodeName, pod.Name, pod.Namespace, uuid)
+			} else {
+				l.cache.Set(string(pod.UID), fmt.Sprintf("%s@%s", pod.Name, pod.Namespace), cache.DefaultExpiration+util.RandomCacheDuration())
+			}
 		}
+
+		if pods.Continue == "" {
+			break
+		}
+		nextToken = pods.Continue
 	}
-	return fmt.Sprintf("pod was OOM killed. node:%s pod:Unknow namespace:Unknow uuid:%s", nodeName, uuid)
+
+	return
 }
 
 func initialConditions(defaults []types.Condition) []types.Condition {
