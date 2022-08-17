@@ -1,0 +1,75 @@
+ARG GO_VERSION=1.17
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} as gobase
+ENV GOBIN /usr/local/go/bin
+
+FROM --platform=$BUILDPLATFORM centos:centos8 AS build-env
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG BUILDARCH
+ARG TARGETARCH
+
+RUN echo "I am running on $BUILDPLATFORM $BUILDARCH, building for $TARGETPLATFORM $TARGETARCH"
+
+####### go env #######
+
+ENV GOLANG_VERSION ${GO_VERSION}
+ENV GOBIN /usr/local/go/bin
+ENV GOROOT /usr/local/go
+ENV PATH /usr/bin:/usr/local/bin:/usr/local/go/bin:/sbin:/bin
+COPY --from=gobase /usr/local/go /usr/local/go
+
+# 参考https://github.com/kran0/dind-alternative/blob/master/Dockerfile
+
+####### end o env #######
+
+RUN sed -i -e "s|mirrorlist=|#mirrorlist=|g" /etc/yum.repos.d/CentOS-*
+RUN sed -i -e "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*
+RUN yum -y install yum-utils device-mapper-persistent-data lvm2 iptables openssl net-tools binutils wget git unzip\
+ && yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo\
+ #&& yum install docker -b current -y\
+ && yum install docker-ce-19.03.15  -y\
+ && yum clean all && rm -rf /var/cache/yum\
+ && useradd -M -s /bin/false dockremap\
+ && echo "dockremap:524288:65536" >> /etc/subuid\
+ && echo "dockremap:524288:65536" >> /etc/subgid
+
+
+# install helm ossutil
+# RUN wget http://sigma-cerebro.oss-cn-zhangjiakou.aliyuncs.com/tools/helm-v3.8.0-linux-amd64.tar.gz && tar -zxvf helm-v3.8.0-linux-amd64.tar.gz && cp linux-amd64/helm  /usr/local/bin/helm
+# RUN wget https://gosspublic.alicdn.com/ossutil/1.7.10/ossutil64 && chmod 755 ossutil64 && cp ossutil64 /usr/local/bin/ossutil
+# RUN wget http://sigma-cerebro.oss-cn-zhangjiakou.aliyuncs.com/tools/OSS_Python_API_20160419.zip\
+# && unzip OSS_Python_API_20160419.zip -d OSSCMD && cd OSSCMD\
+# && python setup.py install && ln -s `pwd`/osscmd /usr/local/bin/osscmd
+# RUN curl -LO http://sigma-cerebro.oss-cn-zhangjiakou.aliyuncs.com/tools/aliyun  && \
+#    chmod +x aliyun && mv aliyun /usr/local/bin/aliyun
+
+RUN yum -y update; yum clean all; \
+    yum -y install systemd; yum clean all; \
+    yum -y install libsystemd-dev; yum clean all;\
+    yum -y install systemd-devel; yum clean all;\
+    yum -y install make automake gcc gcc-c++ kernel-devel; yum clean all;
+
+
+
+
+#######################################################
+
+ENV GO111MODULE=on
+ENV GOPROXY=https://goproxy.cn,direct
+
+ADD . /src/github.com/AliyunContainerService/node-problem-detector
+ENV GOPATH /:/src/github.com/AliyunContainerService/node-problem-detector/vendor
+WORKDIR /src/github.com/AliyunContainerService/node-problem-detector
+RUN pwd
+RUN ls
+
+RUN  # VERSION="{{.VERSION}}"
+RUN  # IMAGES="{{.VERSION}}"
+RUN  # REGIONS="{{.REGIONS}}"
+RUN  # LOG_LEVEL="{{.LOG_LEVEL}}"
+# RUN  ls /src/github.com/AliyunContainerService/node-problem-detector/
+# RUN  cd /workspace/source/src/github.com/AliyunContainerService/node-problem-detector/
+RUN  make ENABLE_JOURNALD=1
+
+
+#######################################################
