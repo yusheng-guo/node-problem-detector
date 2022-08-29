@@ -1,8 +1,8 @@
 ARG GO_VERSION=1.17
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} as gobase
+FROM --platform=$TARGETPLATFORM golang:${GO_VERSION} as gobase
 ENV GOBIN /usr/local/go/bin
 
-FROM --platform=$BUILDPLATFORM centos:centos8 AS build-env
+FROM --platform=$TARGETPLATFORM centos:centos8 AS builder
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG BUILDARCH
@@ -47,8 +47,9 @@ RUN yum -y update; yum clean all; \
     yum -y install systemd; yum clean all; \
     yum -y install libsystemd-dev; yum clean all;\
     yum -y install systemd-devel; yum clean all;\
+    yum -y install gcc-x86_64-linux-gnu.x86_64; yum clean all;\
+    yum -y install docker-ce-19.03.15; yum clean all;\
     yum -y install make automake gcc gcc-c++ kernel-devel; yum clean all;
-
 
 
 
@@ -60,16 +61,37 @@ ENV GOPROXY=https://goproxy.cn,direct
 ADD . /src/github.com/AliyunContainerService/node-problem-detector
 ENV GOPATH /:/src/github.com/AliyunContainerService/node-problem-detector/vendor
 WORKDIR /src/github.com/AliyunContainerService/node-problem-detector
-RUN pwd
-RUN ls
 
 RUN  # VERSION="{{.VERSION}}"
 RUN  # IMAGES="{{.VERSION}}"
 RUN  # REGIONS="{{.REGIONS}}"
 RUN  # LOG_LEVEL="{{.LOG_LEVEL}}"
 # RUN  ls /src/github.com/AliyunContainerService/node-problem-detector/
-# RUN  cd /workspace/source/src/github.com/AliyunContainerService/node-problem-detector/
-RUN  make ENABLE_JOURNALD=1
+# RUN  cd /src/github.com/AliyunContainerService/node-problem-detector/
 
+RUN make build-binaries LINUX_PLATFORMS=linux_$TARGETARCH
+RUN make build-tar LINUX_PLATFORMS=linux_$TARGETARCH
+
+RUN ls -lR /src/github.com/AliyunContainerService/node-problem-detector/config
+
+RUN ls -l /src/github.com/AliyunContainerService/node-problem-detector/
 
 #######################################################
+
+
+FROM --platform=$TARGETPLATFORM centos:centos8
+MAINTAINER KeyOfSpectator <shichun.fsc@alibaba-inc.com>
+
+RUN systemctl --version
+
+# RUN clean-install util-linux libsystemd0 systemd bash lsof curl
+
+# Avoid symlink of /etc/localtime.
+RUN test -h /etc/localtime && rm -f /etc/localtime && cp /usr/share/zoneinfo/UTC /etc/localtime || true
+
+COPY --from=builder /src/github.com/AliyunContainerService/node-problem-detector/bin/node-problem-detector /node-problem-detector
+COPY --from=builder /src/github.com/AliyunContainerService/node-problem-detector/bin/health-checker ${LOGCOUNTER} /home/kubernetes/bin/
+
+COPY --from=builder /src/github.com/AliyunContainerService/node-problem-detector/config /config
+RUN chmod +x /config/plugin/*.sh
+CMD "/node-problem-detector", "--config.system-log-monitor=/config/kernel-monitor.json"
