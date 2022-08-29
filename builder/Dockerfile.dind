@@ -18,8 +18,6 @@ ENV GOROOT /usr/local/go
 ENV PATH /usr/bin:/usr/local/bin:/usr/local/go/bin:/sbin:/bin
 COPY --from=gobase /usr/local/go /usr/local/go
 
-# 参考https://github.com/kran0/dind-alternative/blob/master/Dockerfile
-
 ####### end o env #######
 
 RUN sed -i -e "s|mirrorlist=|#mirrorlist=|g" /etc/yum.repos.d/CentOS-*
@@ -32,16 +30,6 @@ RUN yum -y install yum-utils device-mapper-persistent-data lvm2 iptables openssl
  && useradd -M -s /bin/false dockremap\
  && echo "dockremap:524288:65536" >> /etc/subuid\
  && echo "dockremap:524288:65536" >> /etc/subgid
-
-
-# install helm ossutil
-# RUN wget http://sigma-cerebro.oss-cn-zhangjiakou.aliyuncs.com/tools/helm-v3.8.0-linux-amd64.tar.gz && tar -zxvf helm-v3.8.0-linux-amd64.tar.gz && cp linux-amd64/helm  /usr/local/bin/helm
-# RUN wget https://gosspublic.alicdn.com/ossutil/1.7.10/ossutil64 && chmod 755 ossutil64 && cp ossutil64 /usr/local/bin/ossutil
-# RUN wget http://sigma-cerebro.oss-cn-zhangjiakou.aliyuncs.com/tools/OSS_Python_API_20160419.zip\
-# && unzip OSS_Python_API_20160419.zip -d OSSCMD && cd OSSCMD\
-# && python setup.py install && ln -s `pwd`/osscmd /usr/local/bin/osscmd
-# RUN curl -LO http://sigma-cerebro.oss-cn-zhangjiakou.aliyuncs.com/tools/aliyun  && \
-#    chmod +x aliyun && mv aliyun /usr/local/bin/aliyun
 
 RUN yum -y update; yum clean all; \
     yum -y install systemd; yum clean all; \
@@ -71,10 +59,6 @@ RUN  # LOG_LEVEL="{{.LOG_LEVEL}}"
 
 RUN make build-binaries LINUX_PLATFORMS=linux_$TARGETARCH ENABLE_JOURNALD=1
 RUN make build-tar LINUX_PLATFORMS=linux_$TARGETARCH ENABLE_JOURNALD=1
-
-RUN ls -lR /src/github.com/AliyunContainerService/node-problem-detector/config
-
-RUN ls -l /src/github.com/AliyunContainerService/node-problem-detector/
 
 #######################################################
 
