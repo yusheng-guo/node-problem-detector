@@ -94,4 +94,4 @@ COPY --from=builder /src/github.com/AliyunContainerService/node-problem-detector
 
 COPY --from=builder /src/github.com/AliyunContainerService/node-problem-detector/config /config
 RUN chmod +x /config/plugin/*.sh
-CMD "/node-problem-detector", "--config.system-log-monitor=/config/kernel-monitor.json"
+ENTRYPOINT ["/node-problem-detector", "--config.system-log-monitor=/config/kernel-monitor.json"]
