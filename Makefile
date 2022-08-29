@@ -131,7 +131,9 @@ endif
 
 ALL_BINARIES = $(foreach binary, $(BINARIES) $(BINARIES_LINUX_ONLY), ./$(binary)) \
   $(foreach platform, $(LINUX_PLATFORMS), $(foreach binary, $(BINARIES) $(BINARIES_LINUX_ONLY), output/$(platform)/$(binary))) \
-  $(foreach binary, $(BINARIES), output/windows_amd64/$(binary).exe)
+#  skip windows bin build
+#  $(foreach binary, $(BINARIES), output/windows_amd64/$(binary).exe)
+  $(foreach binary, $(BINARIES))
 ALL_TARBALLS = $(foreach platform, $(PLATFORMS), $(NPD_NAME_VERSION)-$(platform).tar.gz)
 
 output/windows_amd64/bin/%.exe: $(PKG_SOURCES)
@@ -149,8 +151,6 @@ output/windows_amd64/test/bin/%.exe: $(PKG_SOURCES)
 		-o $@ \
 		-tags "$(WINDOWS_BUILD_TAGS)" \
 		./test/e2e/$(subst -,,$*)
-
-# =x86_64-linux-gnu-gcc need yum install gcc-x86_64-linux-gnu.x86_64
 
 output/linux_amd64/bin/%: $(PKG_SOURCES)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) GO111MODULE=on \
@@ -174,7 +174,8 @@ output/linux_amd64/test/bin/%: $(PKG_SOURCES)
 
 output/linux_arm64/bin/%: $(PKG_SOURCES)
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=$(CGO_ENABLED) GO111MODULE=on \
-	  CC=aarch64-linux-gnu-gcc go build \
+#	  CC=aarch64-linux-gnu-gcc go build \
+	  CC=aarch64-redhat-linux-gcc go build \
 		-mod vendor \
 		-o $@ \
 		-ldflags '-X $(PKG)/pkg/version.version=$(VERSION)' \
@@ -184,7 +185,8 @@ output/linux_arm64/bin/%: $(PKG_SOURCES)
 
 output/linux_arm64/test/bin/%: $(PKG_SOURCES)
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=$(CGO_ENABLED) GO111MODULE=on \
-	  CC=aarch64-linux-gnu-gcc go build \
+#	  CC=aarch64-linux-gnu-gcc go build \
+	  CC=aarch64-redhat-linux-gcc go build \
 		-mod vendor \
 		-o $@ \
 		-tags "$(LINUX_BUILD_TAGS)" \
