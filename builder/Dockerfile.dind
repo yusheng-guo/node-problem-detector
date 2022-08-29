@@ -69,8 +69,8 @@ RUN  # LOG_LEVEL="{{.LOG_LEVEL}}"
 # RUN  ls /src/github.com/AliyunContainerService/node-problem-detector/
 # RUN  cd /src/github.com/AliyunContainerService/node-problem-detector/
 
-RUN make build-binaries LINUX_PLATFORMS=linux_$TARGETARCH
-RUN make build-tar LINUX_PLATFORMS=linux_$TARGETARCH
+RUN make build-binaries LINUX_PLATFORMS=linux_$TARGETARCH ENABLE_JOURNALD=1
+RUN make build-tar LINUX_PLATFORMS=linux_$TARGETARCH ENABLE_JOURNALD=1
 
 RUN ls -lR /src/github.com/AliyunContainerService/node-problem-detector/config
 
