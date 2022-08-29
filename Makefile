@@ -23,7 +23,8 @@ all: build
 
 # PLATFORMS is the set of OS_ARCH that NPD can build against.
 LINUX_PLATFORMS?=linux_amd64 linux_arm64
-PLATFORMS=$(LINUX_PLATFORMS) windows_amd64
+PLATFORMS=$(LINUX_PLATFORMS)
+#PLATFORMS=$(LINUX_PLATFORMS) windows_amd64
 
 # VERSION is the version of the binary.
 VERSION?=$(shell if [ -d .git ]; then echo `git describe --tags --dirty`; else echo "UNKNOWN"; fi)
@@ -32,7 +33,7 @@ VERSION?=$(shell if [ -d .git ]; then echo `git describe --tags --dirty`; else e
 TAG?=$(VERSION)
 
 # REGISTRY is the container registry to push into.
-REGISTRY?=gcr.io/k8s-staging-npd
+REGISTRY?=registry.cn-hangzhou.aliyuncs.com
 
 # UPLOAD_PATH is the cloud storage path to upload release tar.
 UPLOAD_PATH?=gs://kubernetes-release
@@ -58,7 +59,7 @@ NPD_NAME_VERSION?=node-problem-detector-$(VERSION)
 TARBALL=$(NPD_NAME_VERSION).tar.gz
 
 # IMAGE is the image name of the node problem detector container image.
-IMAGE:=$(REGISTRY)/node-problem-detector:$(TAG)
+IMAGE:=$(REGISTRY)/acs/node-problem-detector:$(TAG)
 
 # ENABLE_JOURNALD enables build journald support or not. Building journald
 # support needs libsystemd-dev or libsystemd-journal-dev.
@@ -149,9 +150,12 @@ output/windows_amd64/test/bin/%.exe: $(PKG_SOURCES)
 		-tags "$(WINDOWS_BUILD_TAGS)" \
 		./test/e2e/$(subst -,,$*)
 
+# =x86_64-linux-gnu-gcc need yum install gcc-x86_64-linux-gnu.x86_64
+
 output/linux_amd64/bin/%: $(PKG_SOURCES)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) GO111MODULE=on \
-	  CC=x86_64-linux-gnu-gcc go build \
+#	  CC=x86_64-linux-gnu-gcc go build \
+	  CC=x86_64-redhat-linux-gcc go build \
 		-mod vendor \
 		-o $@ \
 		-ldflags '-X $(PKG)/pkg/version.version=$(VERSION)' \
@@ -161,7 +165,8 @@ output/linux_amd64/bin/%: $(PKG_SOURCES)
 
 output/linux_amd64/test/bin/%: $(PKG_SOURCES)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=$(CGO_ENABLED) GO111MODULE=on \
-	  CC=x86_64-linux-gnu-gcc go build \
+#	  CC=x86_64-linux-gnu-gcc go build \
+	  CC=x86_64-redhat-linux-gcc go build \
 		-mod vendor \
 		-o $@ \
 		-tags "$(LINUX_BUILD_TAGS)" \
