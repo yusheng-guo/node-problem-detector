@@ -1,7 +1,10 @@
 .idea
 /bin/
-/Dockerfile
-/*.tar.gz
+/test/bin/
+/*.tar.gz*
 ci.env
 pr.env
 junit*.xml
+debug.test
+/output/
+coverage.out

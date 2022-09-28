@@ -17,12 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/node-problem-detector/pkg/systemlogmonitor"
-	"os"
-
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
-
 	_ "k8s.io/node-problem-detector/cmd/nodeproblemdetector/exporterplugins"
 	_ "k8s.io/node-problem-detector/cmd/nodeproblemdetector/problemdaemonplugins"
 	"k8s.io/node-problem-detector/cmd/options"
@@ -31,19 +26,24 @@ import (
 	"k8s.io/node-problem-detector/pkg/exporters/prometheusexporter"
 	"k8s.io/node-problem-detector/pkg/problemdaemon"
 	"k8s.io/node-problem-detector/pkg/problemdetector"
+	"k8s.io/node-problem-detector/pkg/systemlogmonitor"
 	"k8s.io/node-problem-detector/pkg/types"
 	"k8s.io/node-problem-detector/pkg/version"
 )
 
-func main() {
-	npdo := options.NewNodeProblemDetectorOptions()
-	npdo.AddFlags(pflag.CommandLine)
+func npdInteractive(npdo *options.NodeProblemDetectorOptions) {
+	termCh := make(chan error, 1)
+	defer close(termCh)
 
-	pflag.Parse()
+	if err := npdMain(npdo, termCh); err != nil {
+		glog.Fatalf("Problem detector failed with error: %v", err)
+	}
+}
 
+func npdMain(npdo *options.NodeProblemDetectorOptions, termCh <-chan error) error {
 	if npdo.PrintVersion {
 		version.PrintVersion()
-		os.Exit(0)
+		return nil
 	}
 
 	npdo.SetNodeNameOrDie()
@@ -61,6 +61,7 @@ func main() {
 	} else {
 		glog.Error("Failed to initialize System Log Monitor K8S client")
 	}
+
 	// Initialize exporters.
 	defaultExporters := []types.Exporter{}
 	if ke := k8sexporter.NewExporterOrDie(npdo); ke != nil {
@@ -84,7 +85,5 @@ func main() {
 
 	// Initialize NPD core.
 	p := problemdetector.NewProblemDetector(problemDaemons, npdExporters)
-	if err := p.Run(); err != nil {
-		glog.Fatalf("Problem detector failed with error: %v", err)
-	}
+	return p.Run(termCh)
 }

@@ -19,19 +19,18 @@ package problemclient
 import (
 	"encoding/json"
 	"fmt"
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/node-problem-detector/pkg/util"
-	"net/url"
-	"os"
-	"path/filepath"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	clientset "k8s.io/client-go/kubernetes"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/node-problem-detector/pkg/util"
+	"net/url"
+	"os"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"k8s.io/heapster/common/kubernetes"
@@ -54,11 +53,12 @@ type Client interface {
 }
 
 type nodeProblemClient struct {
-	nodeName  string
-	client    typedcorev1.CoreV1Interface
-	clock     clock.Clock
-	recorders map[string]record.EventRecorder
-	nodeRef   *v1.ObjectReference
+	nodeName       string
+	client         typedcorev1.CoreV1Interface
+	clock          clock.Clock
+	recorders      map[string]record.EventRecorder
+	nodeRef        *v1.ObjectReference
+	eventNamespace string
 }
 
 // NewClientOrDie creates a new problem client, panics if error occurs.
@@ -74,10 +74,15 @@ func NewClientOrDie(npdo *options.NodeProblemDetectorOptions) Client {
 	}
 
 	cfg.UserAgent = fmt.Sprintf("%s/%s", filepath.Base(os.Args[0]), version.Version())
+	// warning! this client use protobuf can not used on CRD
+	// https://kubernetes.io/docs/reference/using-api/api-concepts/
+	cfg.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	cfg.ContentType = "application/vnd.kubernetes.protobuf"
 	// TODO(random-liu): Set QPS Limit
 	c.client = clientset.NewForConfigOrDie(cfg).CoreV1()
 	c.nodeName = npdo.NodeName
-	c.nodeRef = getNodeRef(c.nodeName)
+	c.eventNamespace = npdo.EventNamespace
+	c.nodeRef = getNodeRef(c.eventNamespace, c.nodeName)
 	c.recorders = make(map[string]record.EventRecorder)
 	return c
 }
@@ -114,17 +119,16 @@ func (c *nodeProblemClient) Eventf(eventType, source, reason, messageFmt string,
 	recorder, found := c.recorders[source]
 	if !found {
 		// TODO(random-liu): If needed use separate client and QPS limit for event.
-		recorder = getEventRecorder(c.client, c.nodeName, source)
+		recorder = getEventRecorder(c.client, c.eventNamespace, c.nodeName, source)
 		c.recorders[source] = recorder
 	}
 	recorder.Eventf(c.nodeRef, eventType, reason, messageFmt, args...)
 }
 
-
 func (c *nodeProblemClient) PodEventf(eventType, source, reason, messageFmt string, args ...interface{}) {
 	recorder, found := c.recorders[source]
 	if !found {
-		recorder = getEventRecorder(c.client, c.nodeName, source)
+		recorder = getEventRecorder(c.client, "", c.nodeName, source)
 		c.recorders[source] = recorder
 	}
 	rst := util.PodOOMRegex.FindStringSubmatch(messageFmt)
@@ -153,20 +157,20 @@ func generatePatch(conditions []v1.NodeCondition) ([]byte, error) {
 }
 
 // getEventRecorder generates a recorder for specific node name and source.
-func getEventRecorder(c typedcorev1.CoreV1Interface, nodeName, source string) record.EventRecorder {
+func getEventRecorder(c typedcorev1.CoreV1Interface, namespace, nodeName, source string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.V(4).Infof)
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: source, Host: nodeName})
-	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: c.Events("")})
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: c.Events(namespace)})
 	return recorder
 }
 
-func getNodeRef(nodeName string) *v1.ObjectReference {
+func getNodeRef(namespace, nodeName string) *v1.ObjectReference {
 	// TODO(random-liu): Get node to initialize the node reference
 	return &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeName),
-		Namespace: "",
+		Namespace: namespace,
 	}
 }

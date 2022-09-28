@@ -26,5 +26,6 @@ const journaldPluginName = "journald"
 
 func init() {
 	// Register the journald plugin.
+
 	registerLogWatcher(journaldPluginName, journald.NewJournaldWatcher)
 }

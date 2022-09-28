@@ -86,6 +86,10 @@ func InitK8sClientOrDie(options *options.NodeProblemDetectorOptions) *clientset.
 		panic(err)
 	}
 	cfg.UserAgent = fmt.Sprintf("%s/%s", filepath.Base(os.Args[0]), version.Version())
+	// warning! this client use protobuf can not used on CRD
+	// https://kubernetes.io/docs/reference/using-api/api-concepts/
+	cfg.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	cfg.ContentType = "application/vnd.kubernetes.protobuf"
 	k8sClient = clientset.NewForConfigOrDie(cfg)
 	return k8sClient
 }
@@ -224,10 +228,10 @@ func (l *logMonitor) generateStatus(logs []*logtypes.Log, rule systemlogtypes.Ru
 	if rule.Type == types.Temp {
 		// For temporary error only generate event
 		events = append(events, types.Event{
-			Severity:   types.Warn,
-			Timestamp:  timestamp,
-			Reason:     rule.Reason,
-			Message:    message,
+			Severity:  types.Warn,
+			Timestamp: timestamp,
+			Reason:    rule.Reason,
+			Message:   message,
 		})
 	} else {
 		// For permanent error changes the condition

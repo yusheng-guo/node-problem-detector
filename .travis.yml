@@ -1,11 +1,10 @@
 os:
  - linux
 sudo: required
-dist: trusty
+dist: xenial
 language: go
 go:
- - "1.11"
- - "1.12"
+ - "1.16"
  - master
 env:
 - GO111MODULE=on
@@ -13,7 +12,7 @@ services:
  - docker
 before_install:
  - sudo apt-get -qq update
- - sudo apt-get install -y libsystemd-journal-dev
+ - sudo apt-get install -y libsystemd-dev libc6-dev-arm64-cross gcc-aarch64-linux-gnu
 install:
  - mkdir -p $HOME/gopath/src/k8s.io
  - mv $TRAVIS_BUILD_DIR $HOME/gopath/src/k8s.io/node-problem-detector
@@ -29,3 +28,6 @@ script:
  - BUILD_TAGS="disable_system_stats_monitor" make test
  - make clean && BUILD_TAGS="disable_stackdriver_exporter" make
  - BUILD_TAGS="disable_stackdriver_exporter" make test
+ - make clean && ENABLE_JOURNALD=0 make
+ - ENABLE_JOURNALD=0 make test
+ - ENABLE_JOURNALD=0 make build-binaries
