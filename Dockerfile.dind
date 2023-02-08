@@ -21,7 +21,6 @@ LABEL maintainer="Ringtail <zhongwei.lzw@alibaba-inc.com>"
 ENV GOPATH /gopath/
 ENV PATH $GOPATH/bin:$PATH
 ENV ENABLE_JOURNALD 1
-ENV LINUX_PLATFORMS linux_arm64
 
 RUN apt-get update && apt-get --yes install libsystemd-dev gcc
 RUN go version
@@ -49,9 +48,6 @@ RUN make build-binaries
 FROM ${BASEIMAGE}
 MAINTAINER Random Liu <lantaol@google.com>
 
-RUN systemctl --version
-
-# RUN clean-install util-linux libsystemd0 systemd bash lsof curl
 
 # Avoid symlink of /etc/localtime.
 RUN test -h /etc/localtime && rm -f /etc/localtime && cp /usr/share/zoneinfo/UTC /etc/localtime || true

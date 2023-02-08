@@ -74,6 +74,10 @@ func NewClientOrDie(npdo *options.NodeProblemDetectorOptions) Client {
 	}
 
 	cfg.UserAgent = fmt.Sprintf("%s/%s", filepath.Base(os.Args[0]), version.Version())
+	// warning! this client use protobuf can not used on CRD
+	// https://kubernetes.io/docs/reference/using-api/api-concepts/
+	cfg.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	cfg.ContentType = "application/vnd.kubernetes.protobuf"
 	// TODO(random-liu): Set QPS Limit
 	c.client = clientset.NewForConfigOrDie(cfg).CoreV1()
 	c.nodeName = npdo.NodeName
