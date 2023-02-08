@@ -85,7 +85,7 @@ func Recovery() error {
 	return nil
 }
 
-func RandomCacheDuration() time.Duration {
+func RandomDurationMinute(seedMinutes int64) time.Duration {
 	rand.Seed(time.Now().Unix())
-	return time.Duration(rand.Int63n(10) * int64(time.Minute))
+	return time.Duration(rand.Int63n(seedMinutes) * int64(time.Minute))
 }
