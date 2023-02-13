@@ -329,7 +329,7 @@ func (l *logMonitor) generateEventMessage(uuid string, logMessage string) string
 				glog.Errorf("pod oom found, but pod parse cache error. pod uuid: %v, cache value: %v", uuid, cacheVal)
 			}
 		} else {
-			glog.Errorf("pod oom found, but pod get cache error. pod uuid: %v, cache value: %v", uuid, cacheVal)
+			glog.Errorf("pod oom found, but pod get cache error. pod uuid: %v, cache value: %v, cache length: %v, cache items: %v", uuid, cacheVal, l.cache.ItemCount(), l.cache.Items())
 		}
 	}
 	// if failed to generate event message, return original event message.
@@ -369,11 +369,13 @@ func (l *logMonitor) initializeStatus() {
 func (l *logMonitor) listPodAndCache() error {
 	doneChan := make(chan bool)
 	defer close(doneChan)
-
+	statisticStartTime := time.Now().UnixNano()
 	pl, err := k8sClient.CoreV1().Pods("").List(metav1.ListOptions{
 		ResourceVersion: "0",
 		FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
 	})
+	statisticEndListPodTime := time.Now().UnixNano()
+	glog.Infof("listPod spend time: %v seconds, startTime: %v nanoTimestamp, endTime: %v nanoTimestamp", (statisticEndListPodTime-statisticStartTime)/1e9, statisticStartTime, statisticEndListPodTime)
 	if err != nil {
 		glog.Error("Error in listing pods, error: %v", err.Error())
 		return err
@@ -388,17 +390,21 @@ func (l *logMonitor) listPodAndCache() error {
 			} else {
 				l.cache.Set(string(pod.UID), fmt.Sprintf("%s@%s", pod.Name, pod.Namespace), cache.DefaultExpiration+util.RandomDurationMinute(cacheExpireDurationMinutesEachPod))
 			}
-			doneChan <- true
 		}
+		doneChan <- true
 	}(pl.Items)
 	select {
 	case isDone := <-doneChan:
 		if isDone {
+			statisticEndCachePodTime := time.Now().UnixNano()
+			glog.V(8).Infof("pod cache content, cache length: %v, cache items: %v", l.cache.ItemCount(), l.cache.Items())
+			glog.Infof("listPodAndCache spend time: %v seconds, startTime: %v nanoTimestamp, endTime: %v nanoTimestamp", (statisticEndCachePodTime-statisticStartTime)/1e9, statisticStartTime, statisticEndCachePodTime)
 			return nil
 		} else {
 			return errors.New("list pod and cache error")
 		}
-	case <-time.After(time.Millisecond * 1000):
+	case <-time.After(time.Second * 5):
+		glog.Errorf("listPodAndCache timeout. startTime: %v nanoTimestamp", statisticStartTime)
 		return errors.New("list pod and cache timeout")
 	}
 }
