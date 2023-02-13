@@ -306,6 +306,7 @@ func (l *logMonitor) generateEventMessage(uuid string, logMessage string) string
 			}
 			if cacheVal, ok := l.cache.Get(uuid); ok {
 				podName, namespace := parseCache(uuid, cacheVal.(string))
+				glog.V(9).Infof("pod oom hit pod list cache. podName: %v, namespace: %v", podName, namespace)
 				if podName != "" {
 					return generatePodOOMEventMessage(podName, uuid, namespace, nodeName)
 				} else {
