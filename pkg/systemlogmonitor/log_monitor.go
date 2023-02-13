@@ -376,7 +376,7 @@ func (l *logMonitor) listPodAndCache() error {
 		FieldSelector:   fmt.Sprintf("spec.nodeName=%s", nodeName),
 	})
 	statisticEndListPodTime := time.Now().UnixNano()
-	glog.Infof("listPod spend time: %v seconds, startTime: %v nanoTimestamp, endTime: %v nanoTimestamp", (statisticEndListPodTime-statisticStartTime)/1e9, statisticStartTime, statisticEndListPodTime)
+	glog.Infof("listPod spend time: %v ms, startTime: %v nanoTimestamp, endTime: %v nanoTimestamp", (statisticEndListPodTime-statisticStartTime)/1e6, statisticStartTime, statisticEndListPodTime)
 	if err != nil {
 		glog.Error("Error in listing pods, error: %v", err.Error())
 		return err
@@ -399,7 +399,7 @@ func (l *logMonitor) listPodAndCache() error {
 		if isDone {
 			statisticEndCachePodTime := time.Now().UnixNano()
 			glog.V(8).Infof("pod cache content, cache length: %v, cache items: %v", l.cache.ItemCount(), l.cache.Items())
-			glog.Infof("listPodAndCache spend time: %v seconds, startTime: %v nanoTimestamp, endTime: %v nanoTimestamp", (statisticEndCachePodTime-statisticStartTime)/1e9, statisticStartTime, statisticEndCachePodTime)
+			glog.Infof("listPodAndCache spend time: %v ms, startTime: %v nanoTimestamp, endTime: %v nanoTimestamp", (statisticEndCachePodTime-statisticStartTime)/1e6, statisticStartTime, statisticEndCachePodTime)
 			return nil
 		} else {
 			return errors.New("list pod and cache error")
