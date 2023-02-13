@@ -79,7 +79,7 @@ func Recovery() error {
 		}
 		stack := make([]byte, 2048)
 		length := runtime.Stack(stack, true)
-		glog.Error("[%s] %s %s\n", "PANIC RECOVER", e, stack[:length])
+		glog.Errorf("[%s] %s %s\n", "PANIC RECOVER", e, stack[:length])
 		return e
 	}
 	return nil
