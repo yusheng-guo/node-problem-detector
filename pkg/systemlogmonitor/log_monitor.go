@@ -134,6 +134,12 @@ func NewLogMonitorOrDie(configPath string) types.Monitor {
 
 	l.watcher = logwatchers.GetLogWatcherOrDie(l.config.WatcherConfig)
 	l.buffer = NewLogBuffer(l.config.BufferSize)
+	lookback, err := time.ParseDuration(l.config.Lookback)
+	if err != nil {
+		glog.Errorf("log monitor parse lookback error. err: %v, lookback config: %v", err, l.config.Lookback)
+	} else {
+		l.buffer.SetLookback(&lookback)
+	}
 	// A 1000 size channel should be big enough.
 	l.output = make(chan *types.Status, 1000)
 

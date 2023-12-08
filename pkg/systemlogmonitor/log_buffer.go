@@ -19,6 +19,7 @@ package systemlogmonitor
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"k8s.io/node-problem-detector/pkg/systemlogmonitor/types"
 )
@@ -31,14 +32,17 @@ type LogBuffer interface {
 	Match(string) []*types.Log
 	// String returns a concatenated string of the buffered logs.
 	String() string
+
+	SetLookback(lookback *time.Duration)
 }
 
 type logBuffer struct {
 	// buffer is a simple ring buffer.
-	buffer  []*types.Log
-	msg     []string
-	max     int
-	current int
+	buffer   []*types.Log
+	msg      []string
+	max      int
+	current  int
+	lookback *time.Duration
 }
 
 // NewLogBuffer creates log buffer with max line number limit. Because we only match logs
@@ -51,6 +55,10 @@ func NewLogBuffer(maxLines int) *logBuffer {
 		msg:    make([]string, maxLines, maxLines),
 		max:    maxLines,
 	}
+}
+
+func (b *logBuffer) SetLookback(lookback *time.Duration) {
+	b.lookback = lookback
 }
 
 func (b *logBuffer) Push(log *types.Log) {
@@ -87,8 +95,18 @@ func (b *logBuffer) Match(expr string) []*types.Log {
 }
 
 func (b *logBuffer) String() string {
-	logs := append(b.msg[b.current%b.max:], b.msg[:b.current%b.max]...)
-	return concatLogs(logs)
+	logsMsgs := append(b.msg[b.current%b.max:], b.msg[:b.current%b.max]...)
+	logs := append(b.buffer[b.current%b.max:], b.buffer[:b.current%b.max]...)
+	if b.lookback != nil {
+		ontimeLogs := make([]string, 0, len(logs))
+		for i := len(logs) - 1; i > 0; i-- {
+			if logs[i] != nil && logs[i].Timestamp.After(time.Now().Add(-*b.lookback)) {
+				ontimeLogs = append(ontimeLogs, logsMsgs[i])
+			}
+		}
+		logsMsgs = ontimeLogs
+	}
+	return concatLogs(logsMsgs)
 }
 
 // tail returns current tail index.
