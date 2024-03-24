@@ -217,7 +217,7 @@ func (l *logMonitor) parseLog(log *logtypes.Log) {
 			continue
 		}
 		status := l.generateStatus(matched, rule)
-		glog.Infof("New status generated: %+v", status)
+		glog.Infof("New status generated. raw log: %v, matched: %v, status: %+v", log, matched, status)
 		l.output <- status
 	}
 }
