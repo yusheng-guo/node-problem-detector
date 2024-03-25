@@ -219,11 +219,11 @@ func (l *logMonitor) parseLog(log *logtypes.Log) {
 		status := l.generateStatus(matched, rule)
 
 		// debug log 20240325 shichun.fsc
-		matched_logs := []string{}
+		var matched_logs []logtypes.Log
 		for _, matched_log := range matched {
-			matched_logs = append(matched_logs, matched_log.Message)
+			matched_logs = append(matched_logs, *matched_log)
 		}
-		glog.Infof("New status generated. raw log: %v, matched: %v, status: %+v", log, matched_logs, status)
+		glog.Infof("New status generated. raw log: %v, matched: %v, ruleReason: %v, status: %+v", log, matched_logs, rule.Reason, status)
 
 		l.output <- status
 	}
