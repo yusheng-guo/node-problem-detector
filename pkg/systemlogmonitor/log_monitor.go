@@ -227,6 +227,7 @@ func (l *logMonitor) parseLog(log *logtypes.Log) {
 
 		l.output <- status
 	}
+	l.buffer.Clean()
 }
 
 // generateStatus generates status from the logs.

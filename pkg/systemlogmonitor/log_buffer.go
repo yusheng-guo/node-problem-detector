@@ -34,6 +34,8 @@ type LogBuffer interface {
 	// Match with regular expression in the log buffer.
 	Match(string) []*types.Log
 
+	Clean()
+
 	SetLookback(lookback *time.Duration)
 }
 
