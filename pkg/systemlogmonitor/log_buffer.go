@@ -17,7 +17,6 @@ limitations under the License.
 package systemlogmonitor
 
 import (
-	"errors"
 	"regexp"
 	"strings"
 	"time"
@@ -28,7 +27,7 @@ import (
 // LogBuffer buffers the logs and supports match in the log buffer with regular expression.
 type LogBuffer interface {
 	// Push pushes log into the log buffer. It will panic if the buffer is full.
-	Push(*types.Log) error
+	Push(*types.Log)
 	// Poll poll log from the log buffer. It returns nil if no log is available.
 	Poll() *types.Log
 	// Match with regular expression in the log buffer.
@@ -69,15 +68,15 @@ func (b *logBuffer) SetLookback(lookback *time.Duration) {
 	b.lookback = lookback
 }
 
-func (b *logBuffer) Push(log *types.Log) error {
+func (b *logBuffer) Push(log *types.Log) {
 	if b.size == b.max {
-		return errors.New("buffer is full")
+		b.read = (b.read + 1) % b.max
+		b.size--
 	}
 	b.buffer[b.write] = log
 	b.msg[b.write] = log.Message
 	b.write = (b.write + 1) % b.max
 	b.size++
-	return nil
 }
 
 func (b *logBuffer) Poll() *types.Log {
@@ -110,10 +109,12 @@ func (b *logBuffer) Match(expr string) []*types.Log {
 	var matched []*types.Log
 
 	for i := b.read; i != b.write; i = (i + 1) % b.max {
-		if b.buffer[i] != nil && b.buffer[i].Timestamp.After(time.Now().Add(-*b.lookback)) {
-			if reg.MatchString(b.buffer[i].Message) {
-				matched = append(matched, b.buffer[i])
-			}
+		if b.lookback != nil && b.buffer[i] != nil && b.buffer[i].Timestamp.Before(time.Now().Add(-*b.lookback)) {
+			// not ontime log
+			continue
+		}
+		if b.buffer[i] != nil && reg.MatchString(b.buffer[i].Message) {
+			matched = append(matched, b.buffer[i])
 		}
 	}
 	return matched
