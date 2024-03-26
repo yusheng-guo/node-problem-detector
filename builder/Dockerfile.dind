@@ -63,7 +63,7 @@ RUN make build-tar LINUX_PLATFORMS=linux_$TARGETARCH ENABLE_JOURNALD=1
 #######################################################
 
 
-FROM --platform=$TARGETPLATFORM centos:centos8
+FROM --platform=$TARGETPLATFORM registry-cn-hangzhou.ack.aliyuncs.com/dev/alinux:3-base
 MAINTAINER KeyOfSpectator <shichun.fsc@alibaba-inc.com>
 
 RUN systemctl --version
