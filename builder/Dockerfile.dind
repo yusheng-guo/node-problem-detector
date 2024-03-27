@@ -66,6 +66,7 @@ RUN make build-tar LINUX_PLATFORMS=linux_$TARGETARCH ENABLE_JOURNALD=1
 FROM --platform=$TARGETPLATFORM registry-cn-hangzhou.ack.aliyuncs.com/dev/alinux:3-update
 MAINTAINER KeyOfSpectator <shichun.fsc@alibaba-inc.com>
 
+RUN yum install systemd -y && rm -rf /var/cache/yum/
 RUN systemctl --version
 
 # RUN clean-install util-linux libsystemd0 systemd bash lsof curl
