@@ -8,6 +8,9 @@ ARG BUILDPLATFORM
 ARG BUILDARCH
 ARG TARGETARCH
 
+# default is a wildcard path that shouldn't match anything in COPY command. REF: https://github.com/kubernetes/node-problem-detector/blob/master/Makefile#L105
+ARG LOGCOUNTER=*dont-include-log-counter
+
 RUN echo "I am running on $BUILDPLATFORM $BUILDARCH, building for $TARGETPLATFORM $TARGETARCH"
 
 ####### go env #######
